@@ -1,0 +1,12 @@
+@font-face {
+    font-family: 'JetBrainsMono-Regular';
+    src: url('./res/font/JetBrainsMono-Regular.ttf');
+}
+
+.App {
+    position: relative;
+    height: 100%;
+    width: 100%;
+
+    font-family: 'JetBrainsMono-Regular';
+}
