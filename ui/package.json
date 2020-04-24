@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@uifabric/file-type-icons": "^7.2.35",
     "loaders.css": "^0.1.2",
     "react": "^16.13.1",
     "react-axios": "^2.0.3",

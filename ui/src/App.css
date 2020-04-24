@@ -3,10 +3,18 @@
     src: url('./res/font/JetBrainsMono-Regular.ttf');
 }
 
+@font-face {
+    font-family: "file-icons";
+    font-weight: normal;
+    font-style: normal;
+    src: url("https://cdn.jsdelivr.net/npm/@exuanbo/file-icons-js@latest/fonts/file-icons.woff2") format("woff2");
+}
+
 .App {
     position: relative;
     height: 100%;
     width: 100%;
 
     font-family: 'JetBrainsMono-Regular';
+    background-color: rgb(188, 218, 208);
 }
