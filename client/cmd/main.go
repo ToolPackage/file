@@ -1,35 +1,55 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 )
 
-var usage = `Version: 0.0.1-SNAPSHOT
-Usage: fsec [-hncmHbfs] [-a apiUrl]
-Options:
+var usage = `version: 0.0.1-SNAPSHOT
+usage: fsec [-hncmHbfs] [-a apiUrl]
 `
 
 func main() {
-	parseArguments()
+	args := parseArguments()
+
+	if args.HasArg("login") {
+		// TODO: opt name conflicts with group name
+
+	}
 }
 
-func parseArguments() {
-	help := flag.Bool("h", false, "help")
+func parseArguments() (args *Args) {
+	parser := NewArgParser()
+	parser.
+		Options(Option{
+			opt:          "h",
+			help:         "help",
+			required:     false,
+			defaultValue: false,
+		}).
+		Group("login",
+			Option{
+				opt:          "s",
+				help:         "server address",
+				required:     true,
+				defaultValue: "",
+			},
+			Option{
+				opt:          "c",
+				help:         "credential",
+				required:     true,
+				defaultValue: "",
+			})
+	parser.Usage(func() {
+		fmt.Print(usage)
+		parser.PrintDefaultUsage()
+	})
 
-	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, usage)
-		flag.PrintDefaults()
-	}
+	args = parser.Parse()
 
-	flag.Parse()
-
-	if *help {
-		flag.Usage()
+	if args.HasArg("h") {
+		parser.PrintUsage()
 		os.Exit(0)
 	}
-
-	cmd := flag.Arg(0)
-	fmt.Printf(cmd)
+	return args
 }
