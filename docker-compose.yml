@@ -6,3 +6,12 @@ services:
         command: ./server
         ports:
             - "8000:8000"
+        depends_on:
+            - mongo
+        volumes:
+            - ./upload:/upload
+    
+    mongo:
+        image: "mongo:4.2.3"
+        volumes:
+            - ./init:/docker-entrypoint-initdb.d
