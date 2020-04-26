@@ -4,7 +4,7 @@ ENV GOPROXY https://goproxy.cn
 WORKDIR  /src
 COPY . .
 RUN go mod download
-RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /fse/bin/server cmd/server.go
+RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /fse/bin/server cmd/server/main.go
 
 
 FROM alpine:3.11 as prod
