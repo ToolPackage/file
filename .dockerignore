@@ -1,0 +1,9 @@
+# ref: https://docs.docker.com/engine/reference/builder/#dockerignore-file
+
+.git
+**/.idea
+**/.gitignore
+**/node_modules
+**/README.md
+
+client

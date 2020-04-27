@@ -4,11 +4,21 @@ import { Container, Divider, Button, Input, Form, List } from 'semantic-ui-react
 import 'semantic-ui-css/semantic.min.css?global';
 import { Icon } from '@fluentui/react/lib/Icon';
 import { initializeFileTypeIcons, getFileTypeIconProps } from '@uifabric/file-type-icons';
+import Axios from './Axios';
+import API from './API';
 import './App.css';
 
 initializeFileTypeIcons()
 
 export default class App extends Component {
+
+    componentDidMount() {
+        Axios.get(API.getFileList)
+            .then((rep) => {
+                console.log(rep)
+            })
+        console.log(1)
+    }
 
     render() {
         return (
