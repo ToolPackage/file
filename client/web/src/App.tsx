@@ -4,26 +4,35 @@ import { Container, Divider, Button, Input, Form, List } from 'semantic-ui-react
 import 'semantic-ui-css/semantic.min.css?global';
 import { Icon } from '@fluentui/react/lib/Icon';
 import { initializeFileTypeIcons, getFileTypeIconProps } from '@uifabric/file-type-icons';
-import Axios from './Axios';
-import API from './API';
+import FileService, { FileInfo } from './service/FileService';
 import './App.css';
 
 initializeFileTypeIcons()
 
-export default class App extends Component {
+interface AppState {
+    fileList: FileInfo[]
+}
+
+export default class App extends Component<any, AppState> {
+
+    constructor(props: any) {
+        super(props)
+        this.state = {
+            fileList: []
+        }
+    }
 
     componentDidMount() {
-        Axios.get(API.getFileList)
-            .then((rep) => {
-                console.log(rep)
-            })
-        console.log(1)
+        FileService.getFileList().then(fileList => this.setState({fileList}))
     }
 
     render() {
+        const { fileList } = this.state
+
         return (
             <div className='App'>
                 <Container style={{width: '40%', paddingTop: 50}}>
+                    {/* header */}
                     <Form>
                         <Form.Group inline>
                             <Form.Field width='13'>
@@ -44,19 +53,23 @@ export default class App extends Component {
                         </Form.Group>
                     </Form>
                     <Divider />
+                    {/* file list */}
                     <List animated>
-                        <List.Item style={{cursor: 'pointer'}}>
-                            <List.Icon verticalAlign='middle'>
-                                <Icon {...getFileTypeIconProps({extension: 'docx', size: 16})} />
-                            </List.Icon>
-                            <List.Content>
-                                <List.Header>test data file name</List.Header>
-                                <List.Description>
-                                    <span>3kb</span>
-                                    <span style={{marginLeft: 10}}>Uploaded 3 mins ago</span>
-                                </List.Description>
-                            </List.Content>
-                        </List.Item>
+                        {
+                            fileList.map((fileInfo, idx) => (
+                                <List.Item key={idx} style={{cursor: 'pointer'}}>
+                                    <List.Icon verticalAlign='middle'>
+                                        <Icon {...getFileTypeIconProps({extension: 'docx', size: 16})} />
+                                    </List.Icon>
+                                    <List.Content>
+                                        <List.Header>{fileInfo.fileName}</List.Header>
+                                        <List.Description>
+                                            <span>{fileInfo.fileSize}</span>
+                                            <span style={{marginLeft: 10}}>Uploaded 3 mins ago</span>
+                                        </List.Description>
+                                    </List.Content>
+                                </List.Item>))
+                        }
                     </List>
                 </Container>
             </div>

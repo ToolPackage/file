@@ -36,7 +36,7 @@ func New() *Config {
 		FileDir:   fileDir,
 		Host:      host,
 		Port:      port,
-		MongoHost: "mongo",
+		MongoHost: "localhost", // mongo for docker run
 		MongoPort: "27017",
 	}
 	return config

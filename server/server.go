@@ -67,7 +67,7 @@ func Cors() gin.HandlerFunc {
 		if origin != "" {
 			//下面的都是乱添加的-_-~
 			// c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-			c.Header("Access-Control-Allow-Origin", "0.0.0.0")
+			c.Header("Access-Control-Allow-Origin", "http://localhost:3000") // TODO: web client address
 			c.Header("Access-Control-Allow-Headers", headerStr)
 			c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 			// c.Header("Access-Control-Allow-Headers", "Authorization, Content-Length, X-CSRF-Token, Accept, Origin, Host, Connection, Accept-Encoding, Accept-Language,DNT, X-CustomHeader, Keep-Alive, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Pragma")

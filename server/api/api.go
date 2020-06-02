@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"github.com/Luncert/slog"
 	"github.com/ToolPackage/fse/server/config"
 	"github.com/ToolPackage/fse/server/db"
 	"github.com/gin-gonic/gin"
@@ -42,36 +43,42 @@ func GetFilesList(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"status": "ok", "files": results})
+	ctx.JSON(http.StatusOK, results)
 }
 
 func PostFile(ctx *gin.Context) {
 	fileHeader, err := ctx.FormFile("file")
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 
+	// build file metadata
 	fileName := fileHeader.Filename
 	fileSize := fileHeader.Size
 	fileExt := path.Ext(fileName)
 	uid, err := uuid.NewRandom()
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	fileId := uid.String()
 	filePath := fmt.Sprintf("/upload/%s%s", fileId, fileExt)
 
-	err = ctx.SaveUploadedFile(fileHeader, filePath)
+	// read file from ctx and save to
+	file, err := fileHeader.Open()
 	if err != nil {
-		fmt.Println(err)
+		log.Error("failed to read uploaded file", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	if file != nil {
+		// TODO: read file and save to fs
+	}
 
+	// save file metadata to mongo
 	_, err = db.MongoDb.Collection(config.FileInfoMongoCol).InsertOne(
 		context.TODO(),
 		&FileInfo{
@@ -83,7 +90,7 @@ func PostFile(ctx *gin.Context) {
 	)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -118,8 +125,8 @@ func GetFile(ctx *gin.Context) {
 
 func DeleteFile(ctx *gin.Context) {
 	fileId := ctx.Param("fileId")
-	fmt.Println(fileId)
 
+	// query file metadata
 	var info FileInfo
 	err := db.MongoDb.Collection(config.FileInfoMongoCol).FindOne(
 		context.TODO(),
@@ -128,7 +135,7 @@ func DeleteFile(ctx *gin.Context) {
 		},
 	).Decode(&info)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		if err == mongo.ErrNoDocuments {
 			ctx.AbortWithStatus(http.StatusNotFound)
 		} else {
@@ -136,6 +143,8 @@ func DeleteFile(ctx *gin.Context) {
 		}
 		return
 	}
+
+	// TODO: involve storage service to delete file
 	err = os.Remove(info.FilePath)
 	if err != nil {
 		fmt.Println(err)
@@ -143,12 +152,14 @@ func DeleteFile(ctx *gin.Context) {
 		return
 	}
 
+	// delete file metadata
 	res, err := db.MongoDb.Collection(config.FileInfoMongoCol).DeleteOne(context.TODO(), bson.M{"FileId": fileId})
 	if err != nil {
 		fmt.Println(err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+
 	if res.DeletedCount == 0 {
 		ctx.AbortWithStatus(http.StatusNotFound)
 		return
