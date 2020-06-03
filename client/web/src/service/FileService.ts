@@ -19,6 +19,10 @@ export async function getFileList(): Promise<FileInfo[]> {
     }
 }
 
+export async function downloadFile(fileId: string) {
+    
+}
+
 export default {
     getFileList
 }

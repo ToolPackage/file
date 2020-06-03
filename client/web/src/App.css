@@ -18,3 +18,23 @@
     font-family: 'JetBrainsMono-Regular';
     background-color: rgb(188, 218, 208);
 }
+
+.progressContainer {
+    position: absolute;
+    top: 97px;
+    right: -205px;
+    border-left: 1px solid rgba(34,36,38,.15);
+}
+
+.opeartionProgress {
+    display: flex;
+    flex-flow: row nowrap;
+    box-sizing: border-box;
+    position: relative;
+    width: 200px;
+    margin-left: 5px;
+    padding: 3px;
+    background-color: white;
+    box-shadow: 0px 0px 3px rgb(116, 153, 141);
+    border-radius: 5px;
+}
