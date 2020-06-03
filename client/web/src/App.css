@@ -19,6 +19,15 @@
     background-color: rgb(188, 218, 208);
 }
 
+.file {
+    padding: 0px 5px !important;
+    cursor: pointer;
+}
+
+.selectedFile {
+    background-color: rgb(89, 175, 230);
+}
+
 .progressContainer {
     position: absolute;
     top: 97px;
