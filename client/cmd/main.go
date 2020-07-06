@@ -35,7 +35,7 @@ func parseArguments() (args *Args) {
 				defaultValue: "",
 			},
 			Option{
-				opt:          "c",
+				opt:          "c", // TODO:
 				help:         "credential",
 				required:     true,
 				defaultValue: "",
