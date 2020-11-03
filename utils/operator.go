@@ -8,3 +8,10 @@ func OrString(str ...string) string {
 	}
 	return ""
 }
+
+func Min(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}

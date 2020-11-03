@@ -1,91 +1,197 @@
 package service
 
 import (
+	"crypto/md5"
 	"errors"
-	"fmt"
-	log "github.com/Luncert/slog"
-	constants "github.com/ToolPackage/fse/server/common"
 	"os"
 )
 
+const MaxFileChunkDataSize = 64 * 1024                                   // 64kb
+const MaxSequentialFileDataSize = 512 * 1024 * 1024                      // 512MB
+const MaxFileChunkNum = MaxSequentialFileDataSize / MaxFileChunkDataSize // 8192
+const SequentialFileMetadataSize = 32                                    // chunkSize + chunkNum, unit: bytes
+const SequentialFileChunkMetadataSize = 16                               // md5, unit: bytes
+
 type SequentialFile struct {
-	path         string
-	file         *os.File
-	totalSize    int64 // the pre-alloc size of the file, normally it's MaxSequentialFileSize
-	appendOffset int64 // the offset of the append cursor
+	path      string
+	file      *os.File
+	chunkSize uint16
+	chunkNum  uint16
 }
 
-func NewSequentialFile(path string, totalSize int64, appendOffset int64) (s *SequentialFile, err error) {
-	// the totalSize and appendOffset are stored in Mongo
-	if totalSize > constants.MaxSequentialFileSize || totalSize < 0 {
-		err = errors.New("invalid file size")
+type FileChunk struct {
+	chunkId uint16
+	md5     [16]byte
+	content []byte
+}
+
+// Open or create sequential file, if target file exists,
+// chunkSize and chunkNum will be read from file's metadata
+// instead of using function arguments.
+func NewSequentialFile(path string, chunkSize uint16, chunkNum uint16) (s *SequentialFile, err error) {
+	realChunkSize := uint32(chunkSize) + uint32(SequentialFileChunkMetadataSize)
+	totalDataSize := realChunkSize * uint32(chunkNum)
+	totalSize := int64(totalDataSize) + int64(SequentialFileMetadataSize)
+
+	if totalDataSize > MaxSequentialFileDataSize || totalDataSize == 0 {
+		err = errors.New("invalid chunkSize or chunkNum")
 		return
 	}
 
 	var file *os.File
 
 	if _, err = os.Stat(path); err != nil {
-		if !os.IsNotExist(err) {
+		if os.IsNotExist(err) {
 			return
 		}
-
 		// create and open file
 		if file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644); err != nil {
 			return
 		}
-
-		// re-alloc file space to MaxDataFileSize
+		// re-alloc file space to totalSize
 		if err = os.Truncate(path, totalSize); err != nil {
+			return
+		}
+		// write metadata
+		if err = writeMetadata(file, chunkSize, chunkNum); err != nil {
+			return
+		}
+	} else {
+		// file exists
+		if file, err = os.OpenFile(path, os.O_RDWR, 0644); err != nil {
+			return
+		}
+		// read metadata
+		chunkSize, chunkNum, err = readMetadata(file)
+		if err != nil {
 			return
 		}
 	}
 
-	// file is already created
-	if file, err = os.OpenFile(path, os.O_RDWR, 0644); err != nil {
+	s = &SequentialFile{
+		path:      path,
+		file:      file,
+		chunkSize: chunkSize,
+		chunkNum:  chunkNum,
+	}
+	return
+}
+
+func writeMetadata(f *os.File, chunkSize uint16, chunkNum uint16) (err error) {
+	var metadataByteNum int64 = SequentialFileMetadataSize / 8
+	// seek cursor relating to end fo the file
+	_, err = f.Seek(-metadataByteNum, 2)
+	if err != nil {
 		return
 	}
 
-	s = &SequentialFile{path: path, file: file, totalSize: totalSize, appendOffset: appendOffset}
+	buf := make([]byte, metadataByteNum)
+	convertInt16ToByte(chunkSize, buf, 0)
+	convertInt16ToByte(chunkNum, buf, 1)
 	return
+}
+
+func readMetadata(f *os.File) (chunkSize uint16, chunkNum uint16, err error) {
+	var metadataByteNum int64 = SequentialFileMetadataSize / 8
+	// seek cursor relating to end fo the file
+	_, err = f.Seek(-metadataByteNum, 2)
+	if err != nil {
+		return
+	}
+
+	buf := make([]byte, metadataByteNum)
+	if n, err := f.Read(buf); n != len(buf) || err != nil {
+		return
+	}
+
+	chunkSize = convertByteToInt16(buf, 0)
+	chunkNum = convertByteToInt16(buf, 2)
+	return
+}
+
+func convertInt16ToByte(v uint16, buf []byte, offset int) {
+	buf[offset] = byte(v >> 8)
+	buf[offset+1] = byte(v & 0xffff)
+}
+
+func convertByteToInt16(buf []byte, offset int) uint16 {
+	return uint16(buf[offset])<<8 + uint16(buf[offset+1])
 }
 
 // read block at specified position in the file
-func (s *SequentialFile) Read(offset int64, size int) (data []byte, n int, err error) {
+func (s *SequentialFile) ReadChunk(chunkId uint16) (chunk *FileChunk, err error) {
+	offset := int64(chunkId * s.chunkSize)
 	_, err = s.file.Seek(offset, 0) // seek from the start
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	data = make([]byte, size)
-	n, err = s.file.Read(data)
+	var n int
+	buf := make([]byte, s.chunkSize)
+
+	// read chunk metadata
+	var md5Bytes [16]byte
+	n, err = s.file.Read(buf)
+	if n != len(buf) || err != nil {
+		return
+	}
+	for i := 0; i < 16; i++ {
+		md5Bytes[i] = buf[i]
+	}
+
+	// read chunk data
+	n, err = s.file.Read(buf)
+	if n != len(buf) || err != nil {
+		return
+	}
+
+	chunk = &FileChunk{
+		chunkId: chunkId,
+		md5:     md5Bytes,
+		content: buf[SequentialFileChunkMetadataSize:],
+	}
 	return
 }
 
-func (s *SequentialFile) Append(data []byte) (n int, err error) {
-	if s.totalSize < int64(len(data))+s.appendOffset+1 {
-		return 0, fmt.Errorf("no enough space to write data")
+// Append data to new chunk
+func (s *SequentialFile) AppendChunk(data []byte) (chunkId uint16, err error) {
+	if len(data) > int(s.chunkSize) {
+		err = DataOutOfChunkError
+		return
 	}
+
+	chunkId = s.chunkNum + 1
 
 	// seek file
-	_, err = s.file.Seek(s.appendOffset, 0) // 0 indicates referring the start of the file
-	if err != nil {
-		return 0, err
+	offset := int64(chunkId * s.chunkSize)
+	// 0 indicates referring the start of the file
+	if _, err = s.file.Seek(offset, 0); err != nil {
+		return
 	}
 
+	var n int
+	md5Bytes := md5.Sum(data)
+	n, err = s.file.Write(md5Bytes[:])
+	if err != nil || n != 16 {
+		return
+	}
 	n, err = s.file.Write(data)
+	if err != nil || n != len(data) {
+		return
+	}
+
+	s.chunkNum++
 	return
 }
 
-func (s *SequentialFile) Close() {
+func (s *SequentialFile) Close() error {
 	if err := s.file.Close(); err != nil {
-		log.Error(err)
+		return err
 	}
 	s.path = ""
-	s.totalSize = 0
-	s.appendOffset = 0
+	s.chunkNum = 0
+	s.chunkSize = 0
 	s.file = nil
-}
 
-func (s *SequentialFile) IsClosed() bool {
-	return s.file == nil
+	return nil
 }

@@ -10,13 +10,13 @@ import (
 const TestFilePath = "../../tmp/sequential_file.tmp"
 
 func BenchmarkSequentialFile_Append(b *testing.B) {
-	f, err := NewSequentialFile(TestFilePath, constants.MaxSequentialFileSize, 0)
+	f, err := NewSequentialFile(TestFilePath, MaxFileChunkDataSize, MaxFileChunkNum)
 	if err != nil {
 		panic(err)
 	}
 
-	// prepare test data
-	data := make([]byte, constants.FileChunkSize)
+	// prepare test partitions
+	data := make([]byte, MaxFileChunkDataSize)
 	data[512] = 'A'
 
 	b.StartTimer()
