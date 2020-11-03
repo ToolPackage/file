@@ -2,13 +2,11 @@ package service
 
 import (
 	constants "github.com/ToolPackage/fse/server/common"
-	"github.com/google/uuid"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
-	"time"
 )
 
 var (
@@ -41,32 +39,32 @@ func NewPersistenceService(rootPath string) (p *PersistenceService) {
 	}
 
 	p = &PersistenceService{
-		rootPath: rootPath,
+		rootPath:  rootPath,
 		indexFile: indexFile,
-		dataFile: dataFile,
+		dataFile:  dataFile,
 	}
 	return
 }
 
 func (p *PersistenceService) SaveFile(fileName string, contentType string, data io.Reader) *FileInfo {
-	file := &ChunkedFile{fileName: fileName,
-		contentType:contentType,
-		createdAt:time.Now().Unix(),
-		chunks: []FileChunk{},
-	}
-
-	var (
-		chunk *FileChunk
-		ret int
-		err error
-	)
-
-	for true {
-		chunk = &FileChunk{}
-		ret, err = data.Read(chunk.content)
-		chunk.chunkId =
-	}
-	data.Read()
+	//file := &ChunkedFile{fileName: fileName,
+	//	contentType:contentType,
+	//	createdAt:time.Now().Unix(),
+	//	chunks: []FileChunk{},
+	//}
+	//
+	//var (
+	//	chunk *FileChunk
+	//	ret int
+	//	err error
+	//)
+	//
+	//for true {
+	//	chunk = &FileChunk{}
+	//	ret, err = data.Read(chunk.content)
+	//	chunk.chunkId =
+	//}
+	//data.Read()
 	return nil
 }
 
