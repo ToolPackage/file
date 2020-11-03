@@ -94,6 +94,7 @@ func PostFile(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	//service.PersistenceServiceIns.SaveFile()
 
 	ctx.JSON(http.StatusOK, gin.H{"status": "ok", "FileId": fileId})
 }

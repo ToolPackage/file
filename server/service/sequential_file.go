@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	log "github.com/Luncert/slog"
 	constants "github.com/ToolPackage/fse/server/common"
@@ -14,24 +15,38 @@ type SequentialFile struct {
 	appendOffset int64 // the offset of the append cursor
 }
 
-func NewSequentialFile(path string, totalSize int64, appendOffset int64) (*SequentialFile, error) {
+func NewSequentialFile(path string, totalSize int64, appendOffset int64) (s *SequentialFile, err error) {
 	// the totalSize and appendOffset are stored in Mongo
-	s := &SequentialFile{path: path, totalSize: totalSize, appendOffset: appendOffset}
+	if totalSize > constants.MaxSequentialFileSize || totalSize < 0 {
+		err = errors.New("invalid file size")
+		return
+	}
 
-	var err error
+	var file *os.File
+
 	if _, err = os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			// create and open file
-			s.file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
-			// re-alloc file space to MaxDataFileSize
-			err = os.Truncate(path, constants.MaxSequentialFileSize)
-			return s, err
+		if !os.IsNotExist(err) {
+			return
+		}
+
+		// create and open file
+		if file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644); err != nil {
+			return
+		}
+
+		// re-alloc file space to MaxDataFileSize
+		if err = os.Truncate(path, totalSize); err != nil {
+			return
 		}
 	}
 
 	// file is already created
-	s.file, err = os.OpenFile(path, os.O_RDWR, 0644)
-	return s, err
+	if file, err = os.OpenFile(path, os.O_RDWR, 0644); err != nil {
+		return
+	}
+
+	s = &SequentialFile{path: path, file: file, totalSize: totalSize, appendOffset: appendOffset}
+	return
 }
 
 // read block at specified position in the file
@@ -69,4 +84,8 @@ func (s *SequentialFile) Close() {
 	s.totalSize = 0
 	s.appendOffset = 0
 	s.file = nil
+}
+
+func (s *SequentialFile) IsClosed() bool {
+	return s.file == nil
 }

@@ -7,7 +7,7 @@ type FileChunk struct {
 }
 
 type ChunkedFile struct {
-	filename    string
+	fileName    string
 	contentType string
 	createdAt   int64
 	chunks      []FileChunk
