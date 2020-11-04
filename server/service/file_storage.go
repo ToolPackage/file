@@ -121,12 +121,31 @@ func (fs *FileStorage) OpenStream(file *File) io.Reader {
 	return newFileDataReader(fs, file.partitions)
 }
 
-func (fs *FileStorage) SaveFileData(input io.Reader) (Partitions, error) {
+func (fs *FileStorage) SaveFile(fileName string, contentType string, fileSize uint32, reader io.Reader) (*File, error) {
+	//file := &File{
+	//	fileName:fileName,
+	//	fileSize:fileSize,
+	//	contentType:contentType,
+	//	createdAt:time.Now().UnixNano(),
+	//	partitions:make(Partitions, 0),
+	//}
+	//
+	//chunkBuf := make([]byte, MaxFileChunkDataSize)
+	//n, err := reader.Read(chunkBuf)
 	return nil, nil
 }
 
 func (fs *FileStorage) GetChunk(id PartitionId) (*FileChunk, error) {
-	return nil, nil
+	fileId, chunkId := id.split()
+	if int(fileId) >= len(fs.dataFiles) {
+		return nil, InvalidPartitionIdError
+	}
+	file := fs.dataFiles[fileId]
+	if chunkId >= file.chunkNum {
+		return nil, InvalidPartitionIdError
+	}
+
+	return file.ReadChunk(chunkId)
 }
 
 type FileDataReader struct {
@@ -178,4 +197,8 @@ func (r *FileDataReader) getAvailableChunk() (*FileChunk, error) {
 		}
 	}
 	return r.currentChunk, err
+}
+
+func (id PartitionId) split() (uint16, uint16) {
+	return uint16((id >> 16) & 0xffff), uint16(id & 0xffff)
 }
