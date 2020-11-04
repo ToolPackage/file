@@ -87,8 +87,8 @@ func writeMetadata(f *os.File, chunkSize uint16, chunkNum uint16) (err error) {
 	}
 
 	buf := make([]byte, metadataByteNum)
-	utils.ConvertInt16ToByte(chunkSize, buf, 0)
-	utils.ConvertInt16ToByte(chunkNum, buf, 1)
+	utils.ConvertUint16ToByte(chunkSize, buf, 0)
+	utils.ConvertUint16ToByte(chunkNum, buf, 1)
 	return
 }
 
@@ -106,8 +106,8 @@ func readMetadata(f *os.File) (chunkSize uint16, chunkNum uint16, err error) {
 		return
 	}
 
-	chunkSize = utils.ConvertByteToInt16(buf, 0)
-	chunkNum = utils.ConvertByteToInt16(buf, 2)
+	chunkSize = utils.ConvertByteToUint16(buf, 0)
+	chunkNum = utils.ConvertByteToUint16(buf, 2)
 	return
 }
 

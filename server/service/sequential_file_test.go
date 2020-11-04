@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-const TestFilePath = "../../tmp/sequential_file.tmp"
+const sequentialFilePath = "../../tmp/sequential_file.tmp"
 
 func BenchmarkSequentialFile_Append(b *testing.B) {
-	f, err := NewSequentialFile(TestFilePath, MaxFileChunkDataSize, MaxFileChunkNum)
+	f, err := NewSequentialFile(sequentialFilePath, MaxFileChunkDataSize, MaxFileChunkNum)
 	if err != nil {
 		panic(err)
 	}
@@ -35,8 +35,18 @@ func setup() {
 }
 
 func shutdown() {
+	deleteTmpFile(sequentialFilePath)
+	deleteTmpFile(entrySequenceFilePath)
+}
+
+func deleteTmpFile(path string) {
 	// delete test file
-	if err := os.Remove(TestFilePath); err != nil {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+	}
+	if err := os.Remove(path); err != nil {
 		panic(err)
 	}
 }

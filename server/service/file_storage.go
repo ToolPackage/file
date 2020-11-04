@@ -20,31 +20,33 @@ type FileStorage struct {
 
 type File struct {
 	fileName    string // 128
-	fileSize    int64  // 8
+	fileSize    uint32 // 8
 	contentType string // 32
 	createdAt   int64  // 8
 	partitions  Partitions
 }
 
 //PartitionId = sequential file id + file chunk id
-type PartitionId int32
+type PartitionId uint32
 type Partitions []PartitionId
 
-func NewFileStorage() (fs *FileStorage, err error) {
+const maxPartitionNum = 0xffff - 1 // 65535, 2Bytes
+
+func NewFileStorage() *FileStorage {
 	storagePath := getStoragePath()
 
 	// scan storage path and open all sequential files
 	dataFilePath := path.Join(storagePath, "datafiles")
 	fileNames, err := filepath.Glob(dataFilePath)
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	dataFiles := make([]*SequentialFile, len(fileNames))
 	for _, fileName := range fileNames {
 		id, err := strconv.ParseInt(fileName, 10, 16)
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 
 		dataFile, err := NewSequentialFile(path.Join(dataFilePath, fileName),
@@ -52,14 +54,42 @@ func NewFileStorage() (fs *FileStorage, err error) {
 		dataFiles[id] = dataFile
 	}
 
-	// read file metadata
+	files := readMetadataFile(storagePath)
 
-	fs = &FileStorage{
+	return &FileStorage{
 		storagePath: storagePath,
+		files:       files,
 		dataFiles:   dataFiles,
 	}
+}
 
-	return
+func readMetadataFile(storagePath string) map[string]*File {
+	// TODO: bug
+	defer func() {
+		if err := recover(); err != nil && err == io.EOF {
+			err = nil
+		}
+	}()
+
+	// read file metadata
+	metadataFile := NewEntrySequenceFile(path.Join(storagePath, "metadata.esf"), ReadMode)
+
+	var files = make(map[string]*File)
+	for true {
+		file := &File{}
+		file.fileName = string(metadataFile.ReadEntry())
+		file.fileSize = utils.ConvertByteToUint32(metadataFile.ReadEntry(), 0)
+		file.contentType = string(metadataFile.ReadEntry())
+		file.createdAt = utils.ConvertByteToInt64(metadataFile.ReadEntry(), 0)
+		partitionNum := utils.ConvertByteToUint16(metadataFile.ReadEntry(), 0)
+		partitions := make([]PartitionId, partitionNum)
+		for i := uint16(0); i < partitionNum; i++ {
+			partitions[i] = PartitionId(utils.ConvertByteToUint32(metadataFile.ReadEntry(), 0))
+		}
+		files[file.fileName] = file
+	}
+
+	return files
 }
 
 func getStoragePath() string {

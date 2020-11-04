@@ -2,6 +2,7 @@ package service
 
 import (
 	"github.com/ToolPackage/fse/utils"
+	"io"
 	"os"
 )
 
@@ -12,26 +13,26 @@ type EntrySequenceFile struct {
 	entrySizeBuf []byte
 }
 
-const entrySizeSize = 2         // unit: bytes
-const maxEntrySize = 0xffffffff // 16bits
+const entrySizeSize = 2     // unit: bytes
+const maxEntrySize = 0xffff // 16bits
 const (
 	ReadMode = iota
 	WriteMode
 )
 
-func NewEntrySequenceFile(path string, mode int) (f *EntrySequenceFile, err error) {
+func NewEntrySequenceFile(path string, mode int) *EntrySequenceFile {
 	var file *os.File
 
-	if _, err = os.Stat(path); err != nil {
+	if _, err := os.Stat(path); err != nil {
 		if !os.IsNotExist(err) {
-			return
+			panic(err)
 		}
 		if mode == ReadMode {
-			return
+			panic(err)
 		}
 		// create and open file
 		if file, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644); err != nil {
-			return
+			panic(err)
 		}
 	} else {
 		mode := os.O_RDONLY
@@ -41,59 +42,67 @@ func NewEntrySequenceFile(path string, mode int) (f *EntrySequenceFile, err erro
 
 		// open file
 		if file, err = os.OpenFile(path, mode, 0644); err != nil {
-			return
+			panic(err)
 		}
 	}
 
-	f = &EntrySequenceFile{
+	return &EntrySequenceFile{
 		path:         path,
 		mode:         mode,
 		file:         file,
 		entrySizeBuf: make([]byte, entrySizeSize),
 	}
-	return
 }
 
-func (f *EntrySequenceFile) WriteEntry(entry []byte) error {
+func (f *EntrySequenceFile) WriteEntry(entry []byte) {
 	if f.mode == ReadMode {
-		return InvalidOperationError
+		panic(InvalidOperationError)
 	}
-
 	entrySize := len(entry)
 	if entrySize > maxEntrySize {
-		return EntryTooLargeError
+		panic(InvalidOperationError)
 	}
 
-	utils.ConvertInt16ToByte(uint16(entrySize), f.entrySizeBuf, 0)
+	utils.ConvertUint16ToByte(uint16(entrySize), f.entrySizeBuf, 0)
 	n, err := f.file.Write(f.entrySizeBuf)
 	if n != entrySizeSize || err != nil {
-		return err
+		panic(err)
 	}
 
 	n, err = f.file.Write(entry)
-	return err
+	if n != entrySize || err != nil {
+		panic(err)
+	}
 }
 
-func (f *EntrySequenceFile) ReadEntry() ([]byte, error) {
+func (f *EntrySequenceFile) ReadEntry() []byte {
 	if f.mode == WriteMode {
-		return nil, InvalidOperationError
+		panic(InvalidOperationError)
 	}
 
 	n, err := f.file.Read(f.entrySizeBuf)
 	if n != entrySizeSize || err != nil {
-		return nil, err
+		if err == io.EOF {
+			return nil
+		}
+		panic(err)
 	}
 
-	entrySize := utils.ConvertByteToInt16(f.entrySizeBuf, 0)
+	entrySize := utils.ConvertByteToUint16(f.entrySizeBuf, 0)
 	buf := make([]byte, entrySize)
 	n, err = f.file.Read(buf)
-	if n != entrySizeSize || err != nil {
-		return nil, err
+	if n != int(entrySize) || err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		panic(err)
 	}
 
-	return buf, nil
+	return buf
 }
 
-func (f *EntrySequenceFile) Close() error {
-	return f.file.Close()
+func (f *EntrySequenceFile) Close() {
+	if err := f.file.Close(); err != nil {
+		panic(err)
+	}
 }
