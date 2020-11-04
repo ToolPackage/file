@@ -8,6 +8,8 @@ import (
 
 const sequentialFilePath = "../../tmp/sequential_file.tmp"
 
+// TODO: md5 bug, reopen
+
 func TestSequentialFile_Append(t *testing.T) {
 	var (
 		chunkNum = 100
