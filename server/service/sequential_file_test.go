@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	constants "github.com/ToolPackage/fse/server/common"
 	"os"
 	"testing"
 )
@@ -14,22 +13,21 @@ func BenchmarkSequentialFile_Append(b *testing.B) {
 	if err != nil {
 		panic(err)
 	}
+	defer f.Close()
 
 	// prepare test partitions
 	data := make([]byte, MaxFileChunkDataSize)
 	data[512] = 'A'
 
 	b.StartTimer()
-	var n int
+	var chunkId uint16
 	for i := 0; i < b.N; i++ {
-		n, err = f.Append(data)
-		if n != len(data) {
-			panic(fmt.Sprintf("Expected: %d, got: %d", len(data), n))
+		chunkId, err = f.AppendChunk(data)
+		if int(chunkId) != i {
+			panic(fmt.Sprintf("Expected: %d, got: %d", i, chunkId))
 		}
 	}
 	b.StopTimer()
-
-	f.Close()
 }
 
 func setup() {

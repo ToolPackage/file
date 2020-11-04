@@ -3,10 +3,11 @@ package service
 import (
 	"crypto/md5"
 	"errors"
+	"github.com/ToolPackage/fse/utils"
 	"os"
 )
 
-const MaxFileChunkDataSize = 64 * 1024                                   // 64kb
+const MaxFileChunkDataSize = 64*1024 - 1                                 // (64kb = 65536) overflow uint16
 const MaxSequentialFileDataSize = 512 * 1024 * 1024                      // 512MB
 const MaxFileChunkNum = MaxSequentialFileDataSize / MaxFileChunkDataSize // 8192
 const SequentialFileMetadataSize = 32                                    // chunkSize + chunkNum, unit: bytes
@@ -41,7 +42,7 @@ func NewSequentialFile(path string, chunkSize uint16, chunkNum uint16) (s *Seque
 	var file *os.File
 
 	if _, err = os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
+		if !os.IsNotExist(err) {
 			return
 		}
 		// create and open file
@@ -86,8 +87,8 @@ func writeMetadata(f *os.File, chunkSize uint16, chunkNum uint16) (err error) {
 	}
 
 	buf := make([]byte, metadataByteNum)
-	convertInt16ToByte(chunkSize, buf, 0)
-	convertInt16ToByte(chunkNum, buf, 1)
+	utils.ConvertInt16ToByte(chunkSize, buf, 0)
+	utils.ConvertInt16ToByte(chunkNum, buf, 1)
 	return
 }
 
@@ -100,22 +101,14 @@ func readMetadata(f *os.File) (chunkSize uint16, chunkNum uint16, err error) {
 	}
 
 	buf := make([]byte, metadataByteNum)
-	if n, err := f.Read(buf); n != len(buf) || err != nil {
+	n, err := f.Read(buf)
+	if n != len(buf) || err != nil {
 		return
 	}
 
-	chunkSize = convertByteToInt16(buf, 0)
-	chunkNum = convertByteToInt16(buf, 2)
+	chunkSize = utils.ConvertByteToInt16(buf, 0)
+	chunkNum = utils.ConvertByteToInt16(buf, 2)
 	return
-}
-
-func convertInt16ToByte(v uint16, buf []byte, offset int) {
-	buf[offset] = byte(v >> 8)
-	buf[offset+1] = byte(v & 0xffff)
-}
-
-func convertByteToInt16(buf []byte, offset int) uint16 {
-	return uint16(buf[offset])<<8 + uint16(buf[offset+1])
 }
 
 // read block at specified position in the file

@@ -44,7 +44,7 @@ func NewFileStorage() (fs *FileStorage, err error) {
 	for _, fileName := range fileNames {
 		id, err := strconv.ParseInt(fileName, 10, 16)
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		dataFile, err := NewSequentialFile(path.Join(dataFilePath, fileName),
