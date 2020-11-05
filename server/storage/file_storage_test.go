@@ -18,10 +18,12 @@ func TestNewFileStorage(t *testing.T) {
 	// write
 	file, err := fs.SaveFile("testFile", "html/txt", bytes.NewReader(data))
 	assert.Equal(t, err, nil)
+	id := file.Id
 	assert.Equal(t, file.Size, uint32(len(data)))
 	// read
-	file, ok := fs.GetFile("testFile")
+	file, ok := fs.GetFile(id)
 	assert.Equal(t, ok, true)
+	assert.Equal(t, file.Id, id)
 	assert.Equal(t, file.Name, "testFile")
 	assert.Equal(t, file.Size, uint32(dataSize))
 	assert.Equal(t, file.ContentType, "html/txt")
@@ -31,6 +33,6 @@ func TestNewFileStorage(t *testing.T) {
 	assert.Equal(t, n, int64(dataSize))
 	assert.Equal(t, buf.Bytes(), data)
 	// delete
-	err = fs.DeleteFile("testFile")
+	err = fs.DeleteFile(id)
 	assert.Equal(t, err, nil)
 }

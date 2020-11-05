@@ -44,9 +44,9 @@ func (s *Server) Start() {
 func (s *Server) initRouter() {
 	s.engine.Use(Cors())
 	s.engine.GET("/files", api.GetFilesList)
-	s.engine.POST("/files", api.PostFile)
-	s.engine.GET("/files/:fileId", api.GetFile)
-	s.engine.DELETE("/files/:fileId", api.DeleteFile)
+	s.engine.POST("/file", api.PostFile)
+	s.engine.GET("/file/:fileId", api.GetFile)
+	s.engine.DELETE("/file/:fileId", api.DeleteFile)
 }
 
 func Cors() gin.HandlerFunc {
@@ -55,7 +55,7 @@ func Cors() gin.HandlerFunc {
 
 		origin := c.Request.Header.Get("Origin")
 		var headerKeys []string
-		for k, _ := range c.Request.Header {
+		for k := range c.Request.Header {
 			headerKeys = append(headerKeys, k)
 		}
 		headerStr := strings.Join(headerKeys, ", ")

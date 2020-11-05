@@ -4,6 +4,7 @@ import (
 	"errors"
 	log "github.com/Luncert/slog"
 	"github.com/ToolPackage/fse/utils"
+	"github.com/google/uuid"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,6 +13,15 @@ import (
 	"strconv"
 	"time"
 )
+
+var S = NewFileStorage()
+
+func init() {
+	runtime.SetFinalizer(S, func(fs *FileStorage) {
+		fs.Destroy()
+		log.Info("file storage stopped gracefully")
+	})
+}
 
 // TODO: 并发
 type FileStorage struct {
@@ -73,6 +83,7 @@ func (fs *FileStorage) loadStorageMetadata() {
 	for true {
 		file := &File{}
 		file.fs = fs
+		file.Id = string(readEntry())
 		file.Name = string(readEntry())
 		file.Size = utils.ConvertByteToUint32(readEntry(), 0)
 		file.ContentType = string(readEntry())
@@ -82,7 +93,7 @@ func (fs *FileStorage) loadStorageMetadata() {
 		for i := uint16(0); i < partitionNum; i++ {
 			partitions[i] = PartitionId(utils.ConvertByteToUint32(readEntry(), 0))
 		}
-		files[file.Name] = file
+		files[file.Id] = file
 	}
 }
 
@@ -106,6 +117,7 @@ func (fs *FileStorage) saveStorageMetadata() {
 
 	var buf []byte
 	for _, file := range fs.files {
+		writeEntry([]byte(file.Id))
 		writeEntry([]byte(file.Name))
 
 		buf = make([]byte, 4)
@@ -185,9 +197,19 @@ func getUserHomeDir() string {
 	panic("could not detect home directory")
 }
 
-func (fs *FileStorage) GetFile(fileName string) (f *File, ok bool) {
-	f, ok = fs.files[fileName]
+func (fs *FileStorage) GetFile(id string) (f *File, ok bool) {
+	f, ok = fs.files[id]
 	return
+}
+
+func (fs *FileStorage) GetAllFiles() []*File {
+	list := make([]*File, len(fs.files))
+	i := 0
+	for _, file := range fs.files {
+		list[i] = file
+		i++
+	}
+	return list
 }
 
 //
@@ -200,8 +222,14 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, reader io.R
 		return nil, DuplicateFileNameError
 	}
 
+	uid, err := uuid.NewRandom()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	file := &File{
 		fs:          fs,
+		Id:          uid.String(),
 		Name:        fileName,
 		Size:        0,
 		ContentType: contentType,
@@ -236,7 +264,7 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, reader io.R
 	}
 	file.Size = fileSize
 
-	fs.files[file.Name] = file
+	fs.files[file.Id] = file
 	return file, nil
 }
 
@@ -265,14 +293,14 @@ func (fs *FileStorage) createDataFile() *SequentialFile {
 	return file
 }
 
-func (fs *FileStorage) DeleteFile(fileName string) error {
-	_, ok := fs.files[fileName]
+func (fs *FileStorage) DeleteFile(id string) error {
+	_, ok := fs.files[id]
 	if !ok {
 		return os.ErrNotExist
 	}
 
 	// TODO: mark all partitions deleted
-	delete(fs.files, fileName)
+	delete(fs.files, id)
 	return nil
 }
 
@@ -302,6 +330,7 @@ func (fs *FileStorage) Destroy() {
 
 type File struct {
 	fs          *FileStorage
+	Id          string // 32
 	Name        string // 128
 	Size        uint32 // 8
 	ContentType string // 32
