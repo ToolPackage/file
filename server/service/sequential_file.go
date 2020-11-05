@@ -166,6 +166,11 @@ func (s *SequentialFile) ReadChunk(chunkId uint16) (chunk *FileChunk, err error)
 }
 
 // Append data to new chunk
+// DataOutOfFileError,
+// DataOutOfChunkError,
+// seek failure,
+// write failure,
+// InvalidRetValue
 func (s *SequentialFile) AppendChunk(data []byte) (chunkId uint16, err error) {
 	if s.chunkNum >= s.chunkCap {
 		err = DataOutOfFileError

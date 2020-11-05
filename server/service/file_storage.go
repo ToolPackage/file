@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 type FileStorage struct {
@@ -31,12 +32,13 @@ type PartitionId uint32
 type Partitions []PartitionId
 
 const maxPartitionNum = 0xffff - 1 // 65535, 2Bytes
+const dataFilesDirName = "datafiles"
 
 func NewFileStorage() *FileStorage {
 	storagePath := getStoragePath()
 
 	// scan storage path and open all sequential files
-	dataFilePath := path.Join(storagePath, "datafiles")
+	dataFilePath := path.Join(storagePath, dataFilesDirName)
 	fileNames, err := filepath.Glob(dataFilePath)
 	if err != nil {
 		panic(err)
@@ -49,8 +51,7 @@ func NewFileStorage() *FileStorage {
 			panic(err)
 		}
 
-		dataFile, err := NewSequentialFile(path.Join(dataFilePath, fileName),
-			MaxFileChunkDataSize, MaxFileChunkNum)
+		dataFile, err := NewSequentialFile(path.Join(dataFilePath, fileName), 0, 0)
 		dataFiles[id] = dataFile
 	}
 
@@ -122,17 +123,47 @@ func (fs *FileStorage) OpenStream(file *File) io.Reader {
 }
 
 func (fs *FileStorage) SaveFile(fileName string, contentType string, fileSize uint32, reader io.Reader) (*File, error) {
-	//file := &File{
-	//	fileName:fileName,
-	//	fileSize:fileSize,
-	//	contentType:contentType,
-	//	createdAt:time.Now().UnixNano(),
-	//	partitions:make(Partitions, 0),
-	//}
-	//
-	//chunkBuf := make([]byte, MaxFileChunkDataSize)
-	//n, err := reader.Read(chunkBuf)
-	return nil, nil
+	file := &File{
+		fileName:    fileName,
+		fileSize:    fileSize,
+		contentType: contentType,
+		createdAt:   time.Now().UnixNano(),
+		partitions:  make(Partitions, 0),
+	}
+
+	chunkBuf := make([]byte, MaxFileChunkDataSize)
+	dataFile := fs.dataFiles[len(fs.dataFiles)-1]
+	for true {
+		if _, err := reader.Read(chunkBuf); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		chunkId, err := dataFile.AppendChunk(chunkBuf)
+		if err == DataOutOfFileError {
+			if dataFile, err = fs.createDataFile(); err != nil {
+				return nil, err
+			}
+			if chunkId, err = dataFile.AppendChunk(chunkBuf); err != nil {
+				return nil, err
+			}
+		}
+		partitionId := createPartitionId(uint16(len(fs.dataFiles)), chunkId)
+		file.partitions = append(file.partitions, partitionId)
+	}
+	return file, nil
+}
+
+func (fs *FileStorage) createDataFile() (*SequentialFile, error) {
+	fileId := len(fs.dataFiles)
+	file, err := NewSequentialFile(path.Join(fs.storagePath, dataFilesDirName, strconv.Itoa(fileId)),
+		MaxFileChunkDataSize, MaxFileChunkNum)
+	if err != nil {
+		return nil, err
+	}
+	fs.dataFiles = append(fs.dataFiles, file)
+	return file, nil
 }
 
 func (fs *FileStorage) GetChunk(id PartitionId) (*FileChunk, error) {
@@ -197,6 +228,10 @@ func (r *FileDataReader) getAvailableChunk() (*FileChunk, error) {
 		}
 	}
 	return r.currentChunk, err
+}
+
+func createPartitionId(fileId uint16, chunkId uint16) PartitionId {
+	return PartitionId(uint32(fileId)<<16 + uint32(chunkId))
 }
 
 func (id PartitionId) split() (uint16, uint16) {
