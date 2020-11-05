@@ -184,6 +184,7 @@ func (s *SequentialFile) IsWritable() bool {
 // seek failure,
 // write failure,
 // InvalidRetValue
+// TODO: bug 写文件空间不足
 func (s *SequentialFile) AppendChunk(data []byte) (chunkId uint16, err error) {
 	if s.chunkNum >= s.chunkCap {
 		err = DataOutOfFileError

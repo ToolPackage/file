@@ -17,7 +17,9 @@ import (
 var S = NewFileStorage()
 
 func init() {
+	log.Info("init")
 	runtime.SetFinalizer(S, func(fs *FileStorage) {
+		// TODO: won't be invoked
 		fs.Destroy()
 		log.Info("file storage stopped gracefully")
 	})
