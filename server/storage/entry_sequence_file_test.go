@@ -41,6 +41,8 @@ func TestNewEntrySequenceFile(t *testing.T) {
 
 	err = f.Close()
 	assert.Equal(t, err, nil)
+	err = f.Delete()
+	assert.Equal(t, err, nil)
 }
 
 var seededRand = rand.New(

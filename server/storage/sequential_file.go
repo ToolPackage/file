@@ -9,11 +9,11 @@ import (
 
 // all bytes
 const MaxFileChunkDataSize = 64*1024 - 1   // (64kb = 65536) overflow uint16
-const SequentialFileChunkMetadataSize = 16 // md5
+const SequentialFileChunkMetadataSize = 18 // md5 + chunkSize
 const MaxFileChunkNum = 8192
 
 const SequentialFileMetadataSize = 6        // chunkSize + chunkCap + chunkNum
-const MaxSequentialFileDataSize = 536993792 // almost 512MB, = (MaxFileChunkDataSize + SequentialFileChunkMetadataSize) * MaxFileChunkNum
+const MaxSequentialFileDataSize = 537010176 // almost 512MB, = (MaxFileChunkDataSize + SequentialFileChunkMetadataSize) * MaxFileChunkNum
 
 type SequentialFile struct {
 	path      string
@@ -33,7 +33,6 @@ type FileChunk struct {
 // chunkSize and chunkNum will be read from file's metadata
 // instead of using function arguments.
 func NewSequentialFile(path string, chunkSize uint16, chunkCap uint16) (s *SequentialFile, err error) {
-
 	var file *os.File
 	var chunkNum uint16 = 0
 
@@ -135,7 +134,7 @@ func (s *SequentialFile) ReadChunk(chunkId uint16) (chunk *FileChunk, err error)
 
 	var n int
 
-	// read chunk metadata
+	// read chunk md5
 	var md5Bytes [16]byte
 	n, err = s.file.Read(md5Bytes[:])
 	if err != nil {
@@ -145,14 +144,24 @@ func (s *SequentialFile) ReadChunk(chunkId uint16) (chunk *FileChunk, err error)
 		err = InvalidRetValue
 		return
 	}
-
-	// read chunk data
-	buf := make([]byte, s.chunkSize)
+	// read chunk size
+	buf := make([]byte, 2)
 	n, err = s.file.Read(buf)
 	if err != nil {
 		return
 	}
-	if n != int(s.chunkSize) {
+	if n != 2 {
+		err = InvalidRetValue
+		return
+	}
+	chunkSize := utils.ConvertByteToUint16(buf, 0)
+	// read chunk data
+	buf = make([]byte, chunkSize)
+	n, err = s.file.Read(buf)
+	if err != nil {
+		return
+	}
+	if n != int(chunkSize) {
 		err = InvalidRetValue
 		return
 	}
@@ -197,13 +206,24 @@ func (s *SequentialFile) AppendChunk(data []byte) (chunkId uint16, err error) {
 	}
 
 	var n int
-	// write metadata
+	// write md5
 	md5Bytes := md5.Sum(data)
 	n, err = s.file.Write(md5Bytes[:])
 	if err != nil {
 		return
 	}
 	if n != 16 {
+		err = InvalidRetValue
+		return
+	}
+	// write data size
+	buf := make([]byte, 2)
+	utils.ConvertUint16ToByte(uint16(len(data)), buf, 0)
+	n, err = s.file.Write(buf)
+	if err != nil {
+		return
+	}
+	if n != 2 {
 		err = InvalidRetValue
 		return
 	}
@@ -221,6 +241,10 @@ func (s *SequentialFile) AppendChunk(data []byte) (chunkId uint16, err error) {
 	return
 }
 
+func (c *FileChunk) Validate() bool {
+	return c.md5 == md5.Sum(c.content)
+}
+
 func (s *SequentialFile) Close() (err error) {
 	if err = writeMetadata(s.file, s.chunkSize, s.chunkCap, s.chunkNum); err != nil {
 		return
@@ -229,7 +253,7 @@ func (s *SequentialFile) Close() (err error) {
 	if err = s.file.Close(); err != nil {
 		return
 	}
-	s.path = ""
+	//s.path = ""
 	s.chunkNum = 0
 	s.chunkSize = 0
 	s.file = nil
@@ -237,6 +261,9 @@ func (s *SequentialFile) Close() (err error) {
 	return
 }
 
-func (c *FileChunk) Validate() bool {
-	return c.md5 == md5.Sum(c.content)
+func (s *SequentialFile) Delete() error {
+	if _, err := os.Stat(s.path); err != nil {
+		return err
+	}
+	return os.Remove(s.path)
 }

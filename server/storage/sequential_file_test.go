@@ -1,16 +1,14 @@
 package storage
 
 import (
+	"bytes"
 	"github.com/go-playground/assert/v2"
-	"os"
 	"testing"
 )
 
 const sequentialFilePath = "../../tmp/sequential_file.tmp"
 
-// TODO: md5 bug, reopen
-
-func TestSequentialFile_Append(t *testing.T) {
+func TestNewSequentialFile(t *testing.T) {
 	var (
 		chunkNum = 100
 		stubPos  = 512
@@ -45,32 +43,36 @@ func TestSequentialFile_Append(t *testing.T) {
 
 	err = f.Close()
 	assert.Equal(t, err, nil)
+	err = f.Delete()
+	assert.Equal(t, err, nil)
 }
 
-func setup() {
+func TestSequentialFile_AppendChunk(t *testing.T) {
+	f, err := NewSequentialFile(sequentialFilePath, 20, 5)
+	assert.Equal(t, err, nil)
 
-}
+	data := make([]byte, 13)
+	data[10] = 'A'
 
-func shutdown() {
-	deleteTmpFile(sequentialFilePath)
-	deleteTmpFile(entrySequenceFilePath)
-}
+	chunkId, err := f.AppendChunk(data)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, chunkId == 0, true)
 
-func deleteTmpFile(path string) {
-	// delete test file
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return
-		}
-	}
-	if err := os.Remove(path); err != nil {
-		panic(err)
-	}
-}
+	err = f.Close()
+	assert.Equal(t, err, nil)
 
-func TestMain(m *testing.M) {
-	setup()
-	code := m.Run()
-	shutdown()
-	os.Exit(code)
+	f, err = NewSequentialFile(sequentialFilePath, 0, 0)
+	assert.Equal(t, err, nil)
+
+	chunk, err := f.ReadChunk(0)
+	assert.Equal(t, err, nil)
+
+	assert.Equal(t, chunk.chunkId == 0, true)
+	assert.Equal(t, bytes.Equal(chunk.content, data), true)
+	assert.Equal(t, chunk.Validate(), true)
+
+	err = f.Close()
+	assert.Equal(t, err, nil)
+	err = f.Delete()
+	assert.Equal(t, err, nil)
 }

@@ -114,3 +114,10 @@ func (f *EntrySequenceFile) ReadEntry() ([]byte, error) {
 func (f *EntrySequenceFile) Close() error {
 	return f.file.Close()
 }
+
+func (f *EntrySequenceFile) Delete() error {
+	if _, err := os.Stat(f.path); err != nil {
+		return err
+	}
+	return os.Remove(f.path)
+}
