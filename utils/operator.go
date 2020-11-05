@@ -17,8 +17,26 @@ func Min(a int, b int) int {
 }
 
 func ConvertUint16ToByte(v uint16, buf []byte, offset int) {
-	buf[offset] = byte(v >> 8)
-	buf[offset+1] = byte(v & 0xffff)
+	buf[offset] = byte(v >> 8 & 0xff)
+	buf[offset+1] = byte(v & 0xff)
+}
+
+func ConvertUint32ToByte(v uint32, buf []byte, offset int) {
+	buf[offset] = byte(v >> 24 & 0xff)
+	buf[offset+1] = byte(v >> 16 & 0xff)
+	buf[offset+2] = byte(v >> 8 & 0xff)
+	buf[offset+3] = byte(v & 0xff)
+}
+
+func ConvertInt64ToByte(v int64, buf []byte, offset int) {
+	buf[offset] = byte(v >> 56 & 0xff)
+	buf[offset+1] = byte(v >> 48 & 0xff)
+	buf[offset+2] = byte(v >> 40 & 0xff)
+	buf[offset+3] = byte(v >> 32 & 0xff)
+	buf[offset+4] = byte(v >> 24 & 0xff)
+	buf[offset+5] = byte(v >> 16 & 0xff)
+	buf[offset+6] = byte(v >> 8 & 0xff)
+	buf[offset+7] = byte(v & 0xff)
 }
 
 func ConvertByteToUint16(buf []byte, offset int) uint16 {

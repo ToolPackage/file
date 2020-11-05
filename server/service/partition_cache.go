@@ -2,6 +2,7 @@ package service
 
 type PartitionCache interface {
 	GetChunk(id PartitionId, onFail func() FileChunk) FileChunk
+	Destroy()
 }
 
 type LRUPartitionCache struct {

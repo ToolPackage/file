@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	log "github.com/Luncert/slog"
 	"github.com/ToolPackage/fse/utils"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 )
 
+// TODO: 并发
 type FileStorage struct {
 	storagePath string
 	files       map[string]*File
@@ -33,6 +35,7 @@ type Partitions []PartitionId
 
 const maxPartitionNum = 0xffff - 1 // 65535, 2Bytes
 const dataFilesDirName = "datafiles"
+const storageMetadataFileName = "metadata.esf"
 
 func NewFileStorage() *FileStorage {
 	storagePath := getStoragePath()
@@ -55,7 +58,7 @@ func NewFileStorage() *FileStorage {
 		dataFiles[id] = dataFile
 	}
 
-	files := readMetadataFile(storagePath)
+	files := loadStorageMetadata(storagePath)
 
 	return &FileStorage{
 		storagePath: storagePath,
@@ -64,7 +67,7 @@ func NewFileStorage() *FileStorage {
 	}
 }
 
-func readMetadataFile(storagePath string) map[string]*File {
+func loadStorageMetadata(storagePath string) map[string]*File {
 	// TODO: bug
 	defer func() {
 		if err := recover(); err != nil && err == io.EOF {
@@ -73,7 +76,8 @@ func readMetadataFile(storagePath string) map[string]*File {
 	}()
 
 	// read file metadata
-	metadataFile := NewEntrySequenceFile(path.Join(storagePath, "metadata.esf"), ReadMode)
+	metadataFile := NewEntrySequenceFile(path.Join(storagePath, storageMetadataFileName), ReadMode)
+	defer metadataFile.Close()
 
 	var files = make(map[string]*File)
 	for true {
@@ -91,6 +95,36 @@ func readMetadataFile(storagePath string) map[string]*File {
 	}
 
 	return files
+}
+
+func (fs *FileStorage) saveStorageMetadata() {
+	metadataFile := NewEntrySequenceFile(path.Join(fs.storagePath, storageMetadataFileName), WriteMode)
+	defer metadataFile.Close()
+
+	var buf []byte
+	for _, file := range fs.files {
+		metadataFile.WriteEntry([]byte(file.fileName))
+
+		buf = make([]byte, 4)
+		utils.ConvertUint32ToByte(file.fileSize, buf, 0)
+		metadataFile.WriteEntry(buf)
+
+		metadataFile.WriteEntry([]byte(file.contentType))
+
+		buf = make([]byte, 8)
+		utils.ConvertInt64ToByte(file.createdAt, buf, 0)
+		metadataFile.WriteEntry(buf)
+
+		buf = make([]byte, 2)
+		utils.ConvertUint16ToByte(uint16(len(file.partitions)), buf, 0)
+		metadataFile.WriteEntry(buf)
+
+		buf = make([]byte, 4)
+		for _, id := range file.partitions {
+			utils.ConvertUint32ToByte(uint32(id), buf, 0)
+			metadataFile.WriteEntry(buf)
+		}
+	}
 }
 
 func getStoragePath() string {
@@ -183,6 +217,17 @@ func (fs *FileStorage) GetChunk(id PartitionId) (*FileChunk, error) {
 	}
 
 	return file.ReadChunk(chunkId)
+}
+
+func (fs *FileStorage) Destroy() {
+	fs.saveStorageMetadata()
+	fs.files = nil
+	for _, file := range fs.dataFiles {
+		if err := file.Close(); err != nil {
+			log.Info("failed to close sequential file handle, path = ", file.path, ", err = ", err)
+		}
+	}
+	fs.cache.Destroy()
 }
 
 type FileDataReader struct {
