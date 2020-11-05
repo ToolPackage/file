@@ -134,12 +134,17 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, fileSize ui
 	chunkBuf := make([]byte, MaxFileChunkDataSize)
 	dataFile := fs.dataFiles[len(fs.dataFiles)-1]
 	for true {
+		// read input
 		if _, err := reader.Read(chunkBuf); err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
+		if len(file.partitions) >= maxPartitionNum {
+			return nil, PartitionNumLimitError
+		}
+		// append input to data file
 		chunkId, err := dataFile.AppendChunk(chunkBuf)
 		if err == DataOutOfFileError {
 			if dataFile, err = fs.createDataFile(); err != nil {
@@ -149,6 +154,7 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, fileSize ui
 				return nil, err
 			}
 		}
+		// maintain partition info
 		partitionId := createPartitionId(uint16(len(fs.dataFiles)), chunkId)
 		file.partitions = append(file.partitions, partitionId)
 	}

@@ -11,4 +11,5 @@ var (
 	InvalidPartitionIdError   = errors.New("invalid partition id")
 	InvalidChunkIdError       = errors.New("invalid chunk id")
 	InvalidRetValue           = errors.New("invalid ret value")
+	PartitionNumLimitError    = errors.New("partition num limit error")
 )
