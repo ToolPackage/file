@@ -5,8 +5,8 @@ import (
 	log "github.com/Luncert/slog"
 	"github.com/ToolPackage/fse/utils"
 	"io"
+	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -21,114 +21,147 @@ type FileStorage struct {
 	cache       PartitionCache
 }
 
-type File struct {
-	fileName    string // 128
-	fileSize    uint32 // 8
-	contentType string // 32
-	createdAt   int64  // 8
-	partitions  Partitions
-}
-
-//PartitionId = sequential file id + file chunk id
-type PartitionId uint32
-type Partitions []PartitionId
-
 const maxPartitionNum = 0xffff - 1 // 65535, 2Bytes
+const storageDirName = ".fse"
 const dataFilesDirName = "datafiles"
 const storageMetadataFileName = "metadata.esf"
 
 func NewFileStorage() *FileStorage {
-	storagePath := getStoragePath()
+	fs := &FileStorage{storagePath: getStoragePath(), cache: new(LRUPartitionCache)}
+	fs.initStoragePath()
+	fs.loadStorageMetadata()
+	fs.loadDataFiles()
+	return fs
+}
 
-	// scan storage path and open all sequential files
-	dataFilePath := path.Join(storagePath, dataFilesDirName)
-	fileNames, err := filepath.Glob(dataFilePath)
-	if err != nil {
-		panic(err)
+func (fs *FileStorage) initStoragePath() {
+	_, err := os.Stat(fs.storagePath)
+	if os.IsNotExist(err) {
+		errDir := os.MkdirAll(fs.storagePath, 0644)
+		if errDir != nil {
+			log.Fatal(err)
+		}
 	}
+}
 
-	dataFiles := make([]*SequentialFile, len(fileNames))
-	for _, fileName := range fileNames {
-		id, err := strconv.ParseInt(fileName, 10, 16)
+func (fs *FileStorage) loadStorageMetadata() {
+	// read file metadata
+	metadataFile, err := NewEntrySequenceFile(
+		filepath.Join(fs.storagePath, storageMetadataFileName), ReadMode)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := metadataFile.Close(); err != nil {
+			log.Error(err)
+		}
+
+		if err := recover(); err != io.EOF {
+			log.Fatal("failed to load storage metadata", err)
+		}
+	}()
+	var readEntry = func() []byte {
+		entry, err := metadataFile.ReadEntry()
 		if err != nil {
 			panic(err)
 		}
-
-		dataFile, err := NewSequentialFile(path.Join(dataFilePath, fileName), 0, 0)
-		dataFiles[id] = dataFile
+		return entry
 	}
-
-	files := loadStorageMetadata(storagePath)
-
-	return &FileStorage{
-		storagePath: storagePath,
-		files:       files,
-		dataFiles:   dataFiles,
-	}
-}
-
-func loadStorageMetadata(storagePath string) map[string]*File {
-	// TODO: bug
-	defer func() {
-		if err := recover(); err != nil && err == io.EOF {
-			err = nil
-		}
-	}()
-
-	// read file metadata
-	metadataFile := NewEntrySequenceFile(path.Join(storagePath, storageMetadataFileName), ReadMode)
-	defer metadataFile.Close()
 
 	var files = make(map[string]*File)
+	fs.files = files
 	for true {
 		file := &File{}
-		file.fileName = string(metadataFile.ReadEntry())
-		file.fileSize = utils.ConvertByteToUint32(metadataFile.ReadEntry(), 0)
-		file.contentType = string(metadataFile.ReadEntry())
-		file.createdAt = utils.ConvertByteToInt64(metadataFile.ReadEntry(), 0)
-		partitionNum := utils.ConvertByteToUint16(metadataFile.ReadEntry(), 0)
+		file.fs = fs
+		file.Name = string(readEntry())
+		file.Size = utils.ConvertByteToUint32(readEntry(), 0)
+		file.ContentType = string(readEntry())
+		file.CreatedAt = utils.ConvertByteToInt64(readEntry(), 0)
+		partitionNum := utils.ConvertByteToUint16(readEntry(), 0)
 		partitions := make([]PartitionId, partitionNum)
 		for i := uint16(0); i < partitionNum; i++ {
-			partitions[i] = PartitionId(utils.ConvertByteToUint32(metadataFile.ReadEntry(), 0))
+			partitions[i] = PartitionId(utils.ConvertByteToUint32(readEntry(), 0))
 		}
-		files[file.fileName] = file
+		files[file.Name] = file
 	}
-
-	return files
 }
 
 func (fs *FileStorage) saveStorageMetadata() {
-	metadataFile := NewEntrySequenceFile(path.Join(fs.storagePath, storageMetadataFileName), WriteMode)
-	defer metadataFile.Close()
+	metadataFile, err := NewEntrySequenceFile(
+		filepath.Join(fs.storagePath, storageMetadataFileName), WriteMode)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		err := metadataFile.Close()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	var writeEntry = func(data []byte) {
+		if err := metadataFile.WriteEntry(data); err != nil {
+			log.Fatal("failed to save storage metadata", err)
+		}
+	}
 
 	var buf []byte
 	for _, file := range fs.files {
-		metadataFile.WriteEntry([]byte(file.fileName))
+		writeEntry([]byte(file.Name))
 
 		buf = make([]byte, 4)
-		utils.ConvertUint32ToByte(file.fileSize, buf, 0)
-		metadataFile.WriteEntry(buf)
+		utils.ConvertUint32ToByte(file.Size, buf, 0)
+		writeEntry(buf)
 
-		metadataFile.WriteEntry([]byte(file.contentType))
+		writeEntry([]byte(file.ContentType))
 
 		buf = make([]byte, 8)
-		utils.ConvertInt64ToByte(file.createdAt, buf, 0)
-		metadataFile.WriteEntry(buf)
+		utils.ConvertInt64ToByte(file.CreatedAt, buf, 0)
+		writeEntry(buf)
 
 		buf = make([]byte, 2)
 		utils.ConvertUint16ToByte(uint16(len(file.partitions)), buf, 0)
-		metadataFile.WriteEntry(buf)
+		writeEntry(buf)
 
 		buf = make([]byte, 4)
 		for _, id := range file.partitions {
 			utils.ConvertUint32ToByte(uint32(id), buf, 0)
-			metadataFile.WriteEntry(buf)
+			writeEntry(buf)
 		}
 	}
 }
 
+func (fs *FileStorage) loadDataFiles() {
+	dataFilePath := filepath.Join(fs.storagePath, dataFilesDirName)
+	// create directory if not exists
+	_, err := os.Stat(dataFilePath)
+	if os.IsNotExist(err) {
+		errDir := os.MkdirAll(dataFilePath, 0644)
+		if errDir != nil {
+			log.Fatal(err)
+		}
+	}
+	// scan storage path and open all sequential files
+	files, err := ioutil.ReadDir(dataFilePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dataFiles := make([]*SequentialFile, len(files))
+	for _, fileInfo := range files {
+		id, err := strconv.ParseInt(fileInfo.Name(), 10, 16)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		dataFile, err := NewSequentialFile(filepath.Join(dataFilePath, fileInfo.Name()), 0, 0)
+		dataFiles[id] = dataFile
+	}
+
+	fs.dataFiles = dataFiles
+}
+
 func getStoragePath() string {
-	return filepath.Join(getUserHomeDir(), ".fse")
+	return filepath.Join(getUserHomeDir(), storageDirName)
 }
 
 func getUserHomeDir() string {
@@ -152,24 +185,37 @@ func getUserHomeDir() string {
 	panic("could not detect home directory")
 }
 
-func (fs *FileStorage) OpenStream(file *File) io.Reader {
-	return newFileDataReader(fs, file.partitions)
+func (fs *FileStorage) GetFile(fileName string) (f *File, ok bool) {
+	f, ok = fs.files[fileName]
+	return
 }
 
-func (fs *FileStorage) SaveFile(fileName string, contentType string, fileSize uint32, reader io.Reader) (*File, error) {
+//
+// DuplicateFileNameError
+// write chunk error
+// PartitionNumLimitError
+// read input error
+func (fs *FileStorage) SaveFile(fileName string, contentType string, reader io.Reader) (*File, error) {
+	if _, ok := fs.files[fileName]; ok {
+		return nil, DuplicateFileNameError
+	}
+
 	file := &File{
-		fileName:    fileName,
-		fileSize:    fileSize,
-		contentType: contentType,
-		createdAt:   time.Now().UnixNano(),
+		fs:          fs,
+		Name:        fileName,
+		Size:        0,
+		ContentType: contentType,
+		CreatedAt:   time.Now().UnixNano(),
 		partitions:  make(Partitions, 0),
 	}
 
 	chunkBuf := make([]byte, MaxFileChunkDataSize)
-	dataFile := fs.dataFiles[len(fs.dataFiles)-1]
+	dataFile, fileId := fs.getAvailableDataFile()
+	var fileSize uint32
 	for true {
 		// read input
-		if _, err := reader.Read(chunkBuf); err != nil {
+		n, err := reader.Read(chunkBuf)
+		if err != nil {
 			if err == io.EOF {
 				break
 			}
@@ -178,35 +224,59 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, fileSize ui
 		if len(file.partitions) >= maxPartitionNum {
 			return nil, PartitionNumLimitError
 		}
+		fileSize += uint32(n)
 		// append input to data file
 		chunkId, err := dataFile.AppendChunk(chunkBuf)
-		if err == DataOutOfFileError {
-			if dataFile, err = fs.createDataFile(); err != nil {
-				return nil, err
-			}
-			if chunkId, err = dataFile.AppendChunk(chunkBuf); err != nil {
-				return nil, err
-			}
+		if err != nil {
+			return nil, err
 		}
 		// maintain partition info
-		partitionId := createPartitionId(uint16(len(fs.dataFiles)), chunkId)
+		partitionId := createPartitionId(fileId, chunkId)
 		file.partitions = append(file.partitions, partitionId)
 	}
+	file.Size = fileSize
+
+	fs.files[file.Name] = file
 	return file, nil
 }
 
-func (fs *FileStorage) createDataFile() (*SequentialFile, error) {
+func (fs *FileStorage) getAvailableDataFile() (*SequentialFile, uint16) {
+	sz := len(fs.dataFiles)
+	if sz == 0 {
+		return fs.createDataFile(), 0
+	}
+
+	file := fs.dataFiles[sz-1]
+	if !file.IsWritable() {
+		return fs.createDataFile(), uint16(sz)
+	}
+
+	return file, uint16(sz - 1)
+}
+
+func (fs *FileStorage) createDataFile() *SequentialFile {
 	fileId := len(fs.dataFiles)
-	file, err := NewSequentialFile(path.Join(fs.storagePath, dataFilesDirName, strconv.Itoa(fileId)),
+	file, err := NewSequentialFile(filepath.Join(fs.storagePath, dataFilesDirName, strconv.Itoa(fileId)),
 		MaxFileChunkDataSize, MaxFileChunkNum)
 	if err != nil {
-		return nil, err
+		log.Fatal("failed to create new data file", err)
 	}
 	fs.dataFiles = append(fs.dataFiles, file)
-	return file, nil
+	return file
 }
 
-func (fs *FileStorage) GetChunk(id PartitionId) (*FileChunk, error) {
+func (fs *FileStorage) DeleteFile(fileName string) error {
+	_, ok := fs.files[fileName]
+	if !ok {
+		return os.ErrNotExist
+	}
+
+	// TODO: mark all partitions deleted
+	delete(fs.files, fileName)
+	return nil
+}
+
+func (fs *FileStorage) getChunk(id PartitionId) (*FileChunk, error) {
 	fileId, chunkId := id.split()
 	if int(fileId) >= len(fs.dataFiles) {
 		return nil, InvalidPartitionIdError
@@ -230,18 +300,35 @@ func (fs *FileStorage) Destroy() {
 	fs.cache.Destroy()
 }
 
+type File struct {
+	fs          *FileStorage
+	Name        string // 128
+	Size        uint32 // 8
+	ContentType string // 32
+	CreatedAt   int64  // 8
+	partitions  Partitions
+}
+
+//PartitionId = sequential file id + file chunk id
+type PartitionId uint32
+type Partitions []PartitionId
+
+func (f *File) OpenStream() io.Reader {
+	return newFileDataReader(f.fs, f)
+}
+
 type FileDataReader struct {
 	fs               *FileStorage
-	partitions       Partitions
+	file             *File
 	nextPartitionIdx int
 	currentChunk     *FileChunk
 	chunkReadOffset  int
 }
 
-func newFileDataReader(fs *FileStorage, partitions Partitions) *FileDataReader {
+func newFileDataReader(fs *FileStorage, file *File) *FileDataReader {
 	return &FileDataReader{
 		fs:               fs,
-		partitions:       partitions,
+		file:             file,
 		nextPartitionIdx: -1,
 		currentChunk:     nil,
 		chunkReadOffset:  0,
@@ -256,10 +343,9 @@ func (r *FileDataReader) Read(p []byte) (n int, err error) {
 
 	availableBytes := len(chunk.content) - r.chunkReadOffset
 
-	n = utils.Min(availableBytes, len(p))
-	result := copy(p, chunk.content[r.chunkReadOffset:r.chunkReadOffset+n])
-	if n != result {
-		n = result
+	nRead := utils.Min(availableBytes, len(p))
+	n = copy(p, chunk.content[r.chunkReadOffset:r.chunkReadOffset+nRead])
+	if n != nRead {
 		err = errors.New("copy chunk data error")
 	}
 	r.chunkReadOffset += n
@@ -272,10 +358,11 @@ func (r *FileDataReader) getAvailableChunk() (*FileChunk, error) {
 	if r.currentChunk == nil || r.chunkReadOffset >= len(r.currentChunk.content) {
 		// get next chunk
 		r.nextPartitionIdx++
-		if r.nextPartitionIdx >= len(r.partitions) {
-			err = EndOfPartitionStreamError
+		if r.nextPartitionIdx >= len(r.file.partitions) {
+			err = io.EOF
 		} else {
-			r.currentChunk, err = r.fs.GetChunk(r.partitions[r.nextPartitionIdx])
+			r.currentChunk, err = r.fs.getChunk(r.file.partitions[r.nextPartitionIdx])
+			r.chunkReadOffset = 0
 		}
 	}
 	return r.currentChunk, err

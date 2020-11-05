@@ -1,7 +1,8 @@
 package storage
 
 import (
-	"fmt"
+	"github.com/go-playground/assert/v2"
+	"io"
 	"math/rand"
 	"testing"
 	"time"
@@ -10,32 +11,36 @@ import (
 const entrySequenceFilePath = "../../tmp/entry_sequential_file.tmp"
 
 func TestNewEntrySequenceFile(t *testing.T) {
-	f := NewEntrySequenceFile(entrySequenceFilePath, WriteMode)
+	f, err := NewEntrySequenceFile(entrySequenceFilePath, WriteMode)
+	assert.Equal(t, err, nil)
 
 	testData := make([]string, 100)
 	for i := 0; i < 100; i++ {
 		n := rand.Intn(maxEntrySize)
 		entry := randomString(n)
 		testData[i] = entry
-		f.WriteEntry([]byte(entry))
+		err = f.WriteEntry([]byte(entry))
+		assert.Equal(t, err, nil)
 	}
 
-	f.Close()
+	err = f.Close()
+	assert.Equal(t, err, nil)
 
-	f = NewEntrySequenceFile(entrySequenceFilePath, ReadMode)
+	f, err = NewEntrySequenceFile(entrySequenceFilePath, ReadMode)
+	assert.Equal(t, err, nil)
 
 	for i := 0; i < 100; i++ {
-		entry := f.ReadEntry()
-		if string(entry) != testData[i] {
-			panic(fmt.Sprintf("Expected: %s, got: %s", testData[i], string(entry)))
-		}
+		entry, err := f.ReadEntry()
+		assert.Equal(t, err, nil)
+		assert.Equal(t, entry, []byte(testData[i]))
 	}
 
-	if entry := f.ReadEntry(); entry != nil {
-		panic(fmt.Sprintf("Expect to read nil"))
-	}
+	entry, err := f.ReadEntry()
+	assert.Equal(t, err, io.EOF)
+	assert.Equal(t, entry, nil)
 
-	f.Close()
+	err = f.Close()
+	assert.Equal(t, err, nil)
 }
 
 var seededRand = rand.New(

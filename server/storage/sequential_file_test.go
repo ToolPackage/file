@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"fmt"
+	"github.com/go-playground/assert/v2"
 	"os"
 	"testing"
 )
@@ -16,9 +16,7 @@ func TestSequentialFile_Append(t *testing.T) {
 		stubPos  = 512
 	)
 	f, err := NewSequentialFile(sequentialFilePath, MaxFileChunkDataSize, MaxFileChunkNum)
-	if err != nil {
-		panic(err)
-	}
+	assert.Equal(t, err, nil)
 
 	// prepare test partitions
 	data := make([]byte, MaxFileChunkDataSize)
@@ -27,36 +25,26 @@ func TestSequentialFile_Append(t *testing.T) {
 	var chunkId uint16
 	for i := 0; i < chunkNum; i++ {
 		chunkId, err = f.AppendChunk(data)
-		if err != nil {
-			panic(err)
-		}
-		if chunkId != uint16(i) {
-			panic(fmt.Sprintf("Expected: %d, got: %d", i, chunkId))
-		}
+		assert.Equal(t, err, nil)
+		assert.Equal(t, chunkId, uint16(i))
 	}
 
-	f.Close()
+	err = f.Close()
+	assert.Equal(t, err, nil)
 
 	f, err = NewSequentialFile(sequentialFilePath, 0, 0)
-	if err != nil {
-		panic(err)
-	}
+	assert.Equal(t, err, nil)
 
 	var chunk *FileChunk
 	for i := 0; i < chunkNum; i++ {
 		chunk, err = f.ReadChunk(uint16(i))
-		if err != nil {
-			panic(err)
-		}
-		if chunk.content[stubPos] != 'A' {
-			panic("stub character check failed")
-		}
-		if !chunk.Validate() {
-			panic("md5 check failed")
-		}
+		assert.Equal(t, err, nil)
+		assert.Equal(t, chunk.content[stubPos] == 'A', true)
+		assert.Equal(t, chunk.Validate(), true)
 	}
 
-	f.Close()
+	err = f.Close()
+	assert.Equal(t, err, nil)
 }
 
 func setup() {

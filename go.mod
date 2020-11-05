@@ -7,6 +7,7 @@ require (
 	github.com/Luncert/slog v1.0.0
 	github.com/gin-gonic/gin v1.6.2
 	github.com/go-delve/delve v1.5.0 // indirect
+	github.com/go-playground/assert/v2 v2.0.1
 	github.com/golang/protobuf v1.4.0 // indirect
 	github.com/google/go-dap v0.3.0 // indirect
 	github.com/google/uuid v1.1.1

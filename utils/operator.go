@@ -10,7 +10,7 @@ func OrString(str ...string) string {
 }
 
 func Min(a int, b int) int {
-	if a > b {
+	if a < b {
 		return a
 	}
 	return b

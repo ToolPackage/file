@@ -165,6 +165,10 @@ func (s *SequentialFile) ReadChunk(chunkId uint16) (chunk *FileChunk, err error)
 	return
 }
 
+func (s *SequentialFile) IsWritable() bool {
+	return s.chunkNum < s.chunkCap
+}
+
 // Append data to new chunk
 // DataOutOfFileError,
 // DataOutOfChunkError,

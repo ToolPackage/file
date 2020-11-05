@@ -10,12 +10,18 @@ type LRUPartitionCache struct {
 }
 
 func (c *LRUPartitionCache) GetChunk(id PartitionId, onFail func() FileChunk) FileChunk {
-	chunk, ok := c.partitionMap[id]
-	if ok {
-		return chunk
-	}
+	// TODO:
+	//chunk, ok := c.partitionMap[id]
+	//if ok {
+	//	return chunk
+	//}
+	//
+	//chunk = onFail()
+	//c.partitionMap[id] = chunk
+	//return chunk
+	return onFail()
+}
 
-	chunk = onFail()
-	c.partitionMap[id] = chunk
-	return chunk
+func (c *LRUPartitionCache) Destroy() {
+
 }
