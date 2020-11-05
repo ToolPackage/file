@@ -1,4 +1,4 @@
-package service
+package storage
 
 //import (
 //	constants "github.com/ToolPackage/fse/server/common"

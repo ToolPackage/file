@@ -1,4 +1,4 @@
-package service
+package storage
 
 type PartitionCache interface {
 	GetChunk(id PartitionId, onFail func() FileChunk) FileChunk

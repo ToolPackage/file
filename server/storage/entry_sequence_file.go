@@ -1,4 +1,4 @@
-package service
+package storage
 
 import (
 	"github.com/ToolPackage/fse/utils"
