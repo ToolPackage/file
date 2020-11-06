@@ -2,7 +2,7 @@ package storage
 
 import (
 	"bytes"
-	"github.com/go-playground/assert/v2"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -17,22 +17,22 @@ func TestNewFileStorage(t *testing.T) {
 	data[MaxFileChunkDataSize*2] = 'C'
 	// write
 	file, err := fs.SaveFile("testFile", "html/txt", bytes.NewReader(data))
-	assert.Equal(t, err, nil)
+	assert.Nil(t, err)
 	id := file.Id
-	assert.Equal(t, file.Size, uint32(len(data)))
+	assert.True(t, file.Size == uint32(len(data)))
 	// read
 	file, ok := fs.GetFile(id)
-	assert.Equal(t, ok, true)
+	assert.True(t, ok)
 	assert.Equal(t, file.Id, id)
 	assert.Equal(t, file.Name, "testFile")
-	assert.Equal(t, file.Size, uint32(dataSize))
+	assert.True(t, file.Size == uint32(dataSize))
 	assert.Equal(t, file.ContentType, "html/txt")
 	buf := new(bytes.Buffer)
 	n, err := buf.ReadFrom(file.OpenStream())
-	assert.Equal(t, err, nil)
-	assert.Equal(t, n, int64(dataSize))
+	assert.Nil(t, err)
+	assert.True(t, n == int64(dataSize))
 	assert.Equal(t, buf.Bytes(), data)
 	// delete
 	ok = fs.DeleteFile(id)
-	assert.Equal(t, ok, true)
+	assert.True(t, ok)
 }

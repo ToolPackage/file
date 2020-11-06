@@ -83,7 +83,7 @@ func (fs *FileStorage) loadStorageMetadata() {
 
 	var files = make(map[string]*File)
 	fs.files = files
-	for true {
+	for {
 		file := &File{}
 		file.fs = fs
 		file.Id = string(readEntry())
@@ -134,11 +134,11 @@ func (fs *FileStorage) saveStorageMetadata() {
 		writeEntry(buf)
 
 		buf = make([]byte, 2)
-		utils.ConvertUint16ToByte(uint16(len(file.partitions)), buf, 0)
+		utils.ConvertUint16ToByte(uint16(len(file.Partitions)), buf, 0)
 		writeEntry(buf)
 
 		buf = make([]byte, 4)
-		for _, id := range file.partitions {
+		for _, id := range file.Partitions {
 			utils.ConvertUint32ToByte(uint32(id), buf, 0)
 			writeEntry(buf)
 		}
@@ -237,13 +237,13 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, reader io.R
 		Size:        0,
 		ContentType: contentType,
 		CreatedAt:   time.Now().UnixNano(),
-		partitions:  make(Partitions, 0),
+		Partitions:  make(Partitions, 0),
 	}
 
 	chunkBuf := make([]byte, MaxFileChunkDataSize)
 	dataFile, fileId := fs.getAvailableDataFile()
 	var fileSize uint32
-	for true {
+	for {
 		// read input
 		n, err := reader.Read(chunkBuf)
 		if err != nil {
@@ -252,7 +252,7 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, reader io.R
 			}
 			return nil, err
 		}
-		if len(file.partitions) >= maxPartitionNum {
+		if len(file.Partitions) >= maxPartitionNum {
 			return nil, PartitionNumLimitError
 		}
 		fileSize += uint32(n)
@@ -263,7 +263,7 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, reader io.R
 		}
 		// maintain partition info
 		partitionId := createPartitionId(fileId, chunkId)
-		file.partitions = append(file.partitions, partitionId)
+		file.Partitions = append(file.Partitions, partitionId)
 	}
 	file.Size = fileSize
 
@@ -300,8 +300,8 @@ func (fs *FileStorage) DeleteFile(id string) bool {
 	file, ok := fs.files[id]
 	if ok {
 		delete(fs.files, id)
-		for _, partitionId := range file.partitions {
-			// mark all partitions deleted
+		for _, partitionId := range file.Partitions {
+			// mark all Partitions deleted
 			if err := fs.deleteChunk(partitionId); err != nil {
 				log.Error("failed to delete file chunk, partition id = ", partitionId, err)
 				ok = false
@@ -348,7 +348,7 @@ type File struct {
 	Size        uint32 // 8
 	ContentType string // 32
 	CreatedAt   int64  // 8
-	partitions  Partitions
+	Partitions  Partitions
 }
 
 //PartitionId = sequential file id + file chunk id
@@ -400,10 +400,10 @@ func (r *FileDataReader) getAvailableChunk() (*FileChunk, error) {
 	if r.currentChunk == nil || r.chunkReadOffset >= len(r.currentChunk.content) {
 		// get next chunk
 		r.nextPartitionIdx++
-		if r.nextPartitionIdx >= len(r.file.partitions) {
+		if r.nextPartitionIdx >= len(r.file.Partitions) {
 			err = io.EOF
 		} else {
-			r.currentChunk, err = r.fs.getChunk(r.file.partitions[r.nextPartitionIdx])
+			r.currentChunk, err = r.fs.getChunk(r.file.Partitions[r.nextPartitionIdx])
 			r.chunkReadOffset = 0
 		}
 	}

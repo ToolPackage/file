@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const entrySequenceFilePath = "../../tmp/entry_sequential_file.tmp"
+const entrySequenceFilePath = "../tmp/entry_sequential_file.tmp"
 
 func TestNewEntrySequenceFile(t *testing.T) {
 	f, err := NewEntrySequenceFile(entrySequenceFilePath, WriteMode)

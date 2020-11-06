@@ -19,6 +19,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/spf13/cobra v1.1.1 // indirect
+	github.com/stretchr/testify v1.4.0
 	go.mongodb.org/mongo-driver v1.3.2 // indirect
 	go.starlark.net v0.0.0-20201014215153-dff0ae5b4820 // indirect
 	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff // indirect
