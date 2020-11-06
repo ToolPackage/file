@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -231,7 +232,7 @@ func (fs *FileStorage) SaveFile(fileName string, contentType string, reader io.R
 
 	file := &File{
 		fs:          fs,
-		Id:          uid.String(),
+		Id:          strings.Replace(uid.String(), "-", "", -1),
 		Name:        fileName,
 		Size:        0,
 		ContentType: contentType,
@@ -295,15 +296,20 @@ func (fs *FileStorage) createDataFile() *SequentialFile {
 	return file
 }
 
-func (fs *FileStorage) DeleteFile(id string) error {
-	_, ok := fs.files[id]
-	if !ok {
-		return os.ErrNotExist
+func (fs *FileStorage) DeleteFile(id string) bool {
+	file, ok := fs.files[id]
+	if ok {
+		delete(fs.files, id)
+		for _, partitionId := range file.partitions {
+			// mark all partitions deleted
+			if err := fs.deleteChunk(partitionId); err != nil {
+				log.Error("failed to delete file chunk, partition id = ", partitionId, err)
+				ok = false
+			}
+		}
 	}
 
-	// TODO: mark all partitions deleted
-	delete(fs.files, id)
-	return nil
+	return ok
 }
 
 func (fs *FileStorage) getChunk(id PartitionId) (*FileChunk, error) {
@@ -312,11 +318,16 @@ func (fs *FileStorage) getChunk(id PartitionId) (*FileChunk, error) {
 		return nil, InvalidPartitionIdError
 	}
 	file := fs.dataFiles[fileId]
-	if chunkId >= file.chunkNum {
-		return nil, InvalidPartitionIdError
-	}
-
 	return file.ReadChunk(chunkId)
+}
+
+func (fs *FileStorage) deleteChunk(id PartitionId) error {
+	fileId, chunkId := id.split()
+	if int(fileId) >= len(fs.dataFiles) {
+		return InvalidPartitionIdError
+	}
+	file := fs.dataFiles[fileId]
+	return file.DeleteChunk(chunkId)
 }
 
 func (fs *FileStorage) Destroy() {

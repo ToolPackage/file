@@ -12,15 +12,16 @@ const MaxFileChunkDataSize = 64*1024 - 1   // (64kb = 65536) overflow uint16
 const SequentialFileChunkMetadataSize = 18 // md5 + chunkSize
 const MaxFileChunkNum = 8192
 
-const SequentialFileMetadataSize = 6        // chunkSize + chunkCap + chunkNum
+const SequentialFileMetadataSize = 8        // chunkSize + chunkCap + chunkNum
 const MaxSequentialFileDataSize = 537010176 // almost 512MB, = (MaxFileChunkDataSize + SequentialFileChunkMetadataSize) * MaxFileChunkNum
 
 type SequentialFile struct {
-	path      string
-	file      *os.File
-	chunkSize uint16
-	chunkCap  uint16
-	chunkNum  uint16
+	path            string
+	file            *os.File
+	chunkSize       uint16
+	chunkCap        uint16
+	deletedChunkNum uint16
+	chunkNum        uint16
 }
 
 type FileChunk struct {
@@ -33,8 +34,7 @@ type FileChunk struct {
 // chunkSize and chunkNum will be read from file's metadata
 // instead of using function arguments.
 func NewSequentialFile(path string, chunkSize uint16, chunkCap uint16) (s *SequentialFile, err error) {
-	var file *os.File
-	var chunkNum uint16 = 0
+	s = &SequentialFile{path: path}
 
 	if _, err = os.Stat(path); err != nil {
 		if !os.IsNotExist(err) {
@@ -48,7 +48,7 @@ func NewSequentialFile(path string, chunkSize uint16, chunkCap uint16) (s *Seque
 			return
 		}
 		// create and open file
-		if file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644); err != nil {
+		if s.file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644); err != nil {
 			return
 		}
 		// re-alloc file space to totalSize, totalSize is the file size in bytes
@@ -56,66 +56,68 @@ func NewSequentialFile(path string, chunkSize uint16, chunkCap uint16) (s *Seque
 		if err = os.Truncate(path, totalSize); err != nil {
 			return
 		}
+		// init metadata
+		s.chunkSize = chunkSize
+		s.chunkCap = chunkCap
+		s.chunkNum = 0
+		s.deletedChunkNum = 0
 		// write metadata
-		if err = writeMetadata(file, chunkSize, chunkCap, chunkNum); err != nil {
+		if err = s.writeMetadata(); err != nil {
 			return
 		}
 	} else {
 		// file exists
-		if file, err = os.OpenFile(path, os.O_RDWR, 0644); err != nil {
+		if s.file, err = os.OpenFile(path, os.O_RDWR, 0644); err != nil {
 			return
 		}
 		// read metadata
-		chunkSize, chunkCap, chunkNum, err = readMetadata(file)
-		if err != nil {
+		if err = s.readMetadata(); err != nil {
 			return
 		}
 	}
 
-	s = &SequentialFile{
-		path:      path,
-		file:      file,
-		chunkSize: chunkSize,
-		chunkCap:  chunkCap,
-		chunkNum:  chunkNum,
-	}
 	return
 }
 
-func writeMetadata(f *os.File, chunkSize uint16, chunkCap uint16, chunkNum uint16) (err error) {
-	// seek cursor relating to end fo the file
-	_, err = f.Seek(-SequentialFileMetadataSize, 2)
+func (s *SequentialFile) writeMetadata() (err error) {
+	// seek cursor to the last 8 bytes of the file
+	_, err = s.file.Seek(-SequentialFileMetadataSize, 2)
 	if err != nil {
 		return
 	}
 
 	buf := make([]byte, SequentialFileMetadataSize)
-	utils.ConvertUint16ToByte(chunkSize, buf, 0)
-	utils.ConvertUint16ToByte(chunkCap, buf, 2)
-	utils.ConvertUint16ToByte(chunkNum, buf, 4)
-	n, err := f.Write(buf)
+	utils.ConvertUint16ToByte(s.chunkSize, buf, 0)
+	utils.ConvertUint16ToByte(s.chunkCap, buf, 2)
+	utils.ConvertUint16ToByte(s.deletedChunkNum, buf, 4)
+	utils.ConvertUint16ToByte(s.chunkNum, buf, 6)
+	n, err := s.file.Write(buf)
+	if err != nil {
+		return
+	}
 	if n != SequentialFileMetadataSize {
 		err = InvalidRetValue
 	}
 	return
 }
 
-func readMetadata(f *os.File) (chunkSize uint16, chunkCap uint16, chunkNum uint16, err error) {
+func (s *SequentialFile) readMetadata() (err error) {
 	// seek cursor relating to end fo the file
-	_, err = f.Seek(-SequentialFileMetadataSize, 2)
+	_, err = s.file.Seek(-SequentialFileMetadataSize, 2)
 	if err != nil {
 		return
 	}
 
 	buf := make([]byte, SequentialFileMetadataSize)
-	n, err := f.Read(buf)
+	n, err := s.file.Read(buf)
 	if n != len(buf) || err != nil {
 		return
 	}
 
-	chunkSize = utils.ConvertByteToUint16(buf, 0)
-	chunkCap = utils.ConvertByteToUint16(buf, 2)
-	chunkNum = utils.ConvertByteToUint16(buf, 4)
+	s.chunkSize = utils.ConvertByteToUint16(buf, 0)
+	s.chunkCap = utils.ConvertByteToUint16(buf, 2)
+	s.deletedChunkNum = utils.ConvertByteToUint16(buf, 4)
+	s.chunkNum = utils.ConvertByteToUint16(buf, 6)
 	return
 }
 
@@ -242,12 +244,27 @@ func (s *SequentialFile) AppendChunk(data []byte) (chunkId uint16, err error) {
 	return
 }
 
+func (s *SequentialFile) DeleteChunk(chunkId uint16) error {
+	if chunkId >= s.chunkNum {
+		return InvalidChunkIdError
+	}
+
+	s.deletedChunkNum++
+	if s.deletedChunkNum == s.chunkNum {
+		// when all chunks are deleted,
+		// we could append new chunk to the start of the file now
+		s.deletedChunkNum = 0
+		s.chunkNum = 0
+	}
+	return nil
+}
+
 func (c *FileChunk) Validate() bool {
 	return c.md5 == md5.Sum(c.content)
 }
 
 func (s *SequentialFile) Close() (err error) {
-	if err = writeMetadata(s.file, s.chunkSize, s.chunkCap, s.chunkNum); err != nil {
+	if err = s.writeMetadata(); err != nil {
 		return
 	}
 

@@ -33,6 +33,6 @@ func TestNewFileStorage(t *testing.T) {
 	assert.Equal(t, n, int64(dataSize))
 	assert.Equal(t, buf.Bytes(), data)
 	// delete
-	err = fs.DeleteFile(id)
-	assert.Equal(t, err, nil)
+	ok = fs.DeleteFile(id)
+	assert.Equal(t, ok, true)
 }
