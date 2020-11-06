@@ -10,12 +10,12 @@ import (
 	"strings"
 )
 
-type Server struct {
+type HttpServer struct {
 	engine *gin.Engine
 }
 
-func New() *Server {
-	server := &Server{
+func New() *HttpServer {
+	server := &HttpServer{
 		engine: gin.Default(),
 	}
 
@@ -31,7 +31,7 @@ func New() *Server {
 	return server
 }
 
-func (s *Server) Start() {
+func (s *HttpServer) Start() {
 	s.initRouter()
 
 	addr := config.Conf.Host + ":" + config.Conf.Port
@@ -41,7 +41,7 @@ func (s *Server) Start() {
 	}
 }
 
-func (s *Server) initRouter() {
+func (s *HttpServer) initRouter() {
 	s.engine.Use(Cors())
 	s.engine.GET("/files", api.GetFilesList)
 	s.engine.POST("/file", api.PostFile)
