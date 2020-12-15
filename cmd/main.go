@@ -9,8 +9,8 @@ import (
 func main() {
 	log.InitLogger("cmd/conf/log.yml")
 
-	//s := server.New()
-	//s.Start()
+	// s := server.New()
+	// s.Start()
 
 	addr, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:9330")
 	listener, _ := net.ListenTCP("tcp", addr)
