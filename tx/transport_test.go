@@ -15,7 +15,7 @@ func TestNewChannel(t *testing.T) {
 	chan2 := NewChannel(pipe12, pipe21)
 	chan1.NewPacket("test").
 		StatusCode(http.StatusAccepted).
-		header("name", "asd").
+		Header("name", "asd").
 		Body("hello").
 		Emit()
 	packet := chan2.RecvPacket()

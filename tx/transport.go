@@ -192,7 +192,7 @@ func (pb *PacketBuilder) Body(content interface{}) *PacketBuilder {
 	return pb
 }
 
-func (pb *PacketBuilder) header(name string, value string) *PacketBuilder {
+func (pb *PacketBuilder) Header(name string, value string) *PacketBuilder {
 	name = strings.TrimSpace(name)
 	value = strings.TrimSpace(value)
 	pb.packet.Headers[name] = value

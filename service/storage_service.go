@@ -1,6 +1,7 @@
 package service
 
 import (
+	log "github.com/Luncert/slog"
 	"github.com/ToolPackage/fse/storage"
 	"github.com/ToolPackage/fse/tx"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 
 // actions
 const (
+	Auth     = "auth"
 	List     = "list"
 	Upload   = "upload"
 	Download = "download"
@@ -25,6 +27,11 @@ type FileInfo struct {
 }
 
 type FileDetail struct{}
+
+func auth(c *tx.Channel, _ *tx.Packet) {
+	log.Info("client auth passed")
+	c.NewPacket(Resp).StatusCode(http.StatusOK).Emit()
+}
 
 func listFiles(c *tx.Channel, _ *tx.Packet) {
 	files := storage.S.GetAllFiles()
@@ -59,6 +66,7 @@ func deleteFile(c *tx.Channel, p *tx.Packet) {
 }
 
 func init() {
+	tx.Register(Auth, auth)
 	tx.Register(List, listFiles)
 	tx.Register(Upload, uploadFile)
 	tx.Register(Download, downloadFile)
