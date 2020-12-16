@@ -4,7 +4,6 @@ go 1.14
 
 require (
 	github.com/Luncert/RedisExample v0.0.0-20190910051010-ac5ddefab708 // indirect
-	github.com/Luncert/slog v1.0.0
 	github.com/gin-gonic/gin v1.6.2
 	github.com/go-delve/delve v1.5.0 // indirect
 	github.com/go-playground/assert/v2 v2.0.1

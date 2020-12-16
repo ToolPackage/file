@@ -26,7 +26,7 @@ var handlerMap = make(map[string]ActionHandler)
 func Register(action string, handler ActionHandler) {
 	_, ok := handlerMap[action]
 	if ok {
-		log.Fatal("duplicate action " + action)
+		log.Fatal("duplicated action " + action)
 	}
 	handlerMap[action] = handler
 }
@@ -42,6 +42,11 @@ func NewChannel(in io.Reader, out io.Writer) *Channel {
 
 // main loop
 func (c *Channel) Process() {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Println(err)
+		}
+	}()
 	for {
 		packet := c.RecvPacket()
 		handler, ok := handlerMap[packet.Action]

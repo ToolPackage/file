@@ -2,11 +2,11 @@ package storage
 
 import (
 	"errors"
-	log "github.com/Luncert/slog"
 	"github.com/ToolPackage/fse/utils"
 	"github.com/google/uuid"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,11 +18,11 @@ import (
 var S = NewFileStorage()
 
 func init() {
-	log.Info("init")
+	log.Println("file storage init")
 	runtime.SetFinalizer(S, func(fs *FileStorage) {
 		// TODO: won't be invoked
 		fs.Destroy()
-		log.Info("file storage stopped gracefully")
+		log.Println("file storage stopped gracefully")
 	})
 }
 
@@ -66,7 +66,7 @@ func (fs *FileStorage) loadStorageMetadata() {
 	}
 	defer func() {
 		if err := metadataFile.Close(); err != nil {
-			log.Error(err)
+			log.Println(err)
 		}
 
 		if err := recover(); err != io.EOF {
@@ -109,7 +109,7 @@ func (fs *FileStorage) saveStorageMetadata() {
 	defer func() {
 		err := metadataFile.Close()
 		if err != nil {
-			log.Error(err)
+			log.Println(err)
 		}
 	}()
 	var writeEntry = func(data []byte) {
@@ -303,7 +303,7 @@ func (fs *FileStorage) DeleteFile(id string) bool {
 		for _, partitionId := range file.Partitions {
 			// mark all Partitions deleted
 			if err := fs.deleteChunk(partitionId); err != nil {
-				log.Error("failed to delete file chunk, partition id = ", partitionId, err)
+				log.Println("failed to delete file chunk, partition id = ", partitionId, err)
 				ok = false
 			}
 		}
@@ -335,7 +335,7 @@ func (fs *FileStorage) Destroy() {
 	fs.files = nil
 	for _, file := range fs.dataFiles {
 		if err := file.Close(); err != nil {
-			log.Info("failed to close sequential file handle, path = ", file.path, ", err = ", err)
+			log.Println("failed to close sequential file handle, path = ", file.path, ", err = ", err)
 		}
 	}
 	fs.cache.Destroy()
@@ -351,7 +351,7 @@ type File struct {
 	Partitions  Partitions
 }
 
-//PartitionId = sequential file id + file chunk id
+// PartitionId = sequential file id + file chunk id
 type PartitionId uint32
 type Partitions []PartitionId
 
