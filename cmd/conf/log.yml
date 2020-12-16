@@ -1,3 +1,0 @@
-level: DEBUG
-format: "%T [%L] %S %S %S"
-appender: STDOUT

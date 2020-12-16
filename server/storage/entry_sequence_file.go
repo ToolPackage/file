@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/ToolPackage/fse/utils"
+	"github.com/ToolPackage/fse/common/utils"
 	"os"
 )
 

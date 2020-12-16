@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/ToolPackage/fse/service"
-	"github.com/ToolPackage/fse/tx"
+	"github.com/ToolPackage/fse/common/tx"
+	"github.com/ToolPackage/fse/server/service"
 	"log"
 	"net"
 )

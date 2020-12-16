@@ -2,7 +2,7 @@ package tx
 
 import (
 	"encoding/json"
-	"github.com/ToolPackage/fse/utils"
+	"github.com/ToolPackage/fse/common/utils"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"

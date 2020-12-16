@@ -1,6 +1,6 @@
 package service
 
-import "github.com/ToolPackage/fse/tx"
+import "github.com/ToolPackage/fse/common/tx"
 
 func Init() {
 	tx.Register(Auth, auth)

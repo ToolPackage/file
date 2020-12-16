@@ -3,7 +3,7 @@ package storage
 import (
 	"crypto/md5"
 	"errors"
-	"github.com/ToolPackage/fse/utils"
+	"github.com/ToolPackage/fse/common/utils"
 	"os"
 )
 

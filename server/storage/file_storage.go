@@ -2,7 +2,7 @@ package storage
 
 import (
 	"errors"
-	"github.com/ToolPackage/fse/utils"
+	"github.com/ToolPackage/fse/common/utils"
 	"github.com/google/uuid"
 	"io"
 	"io/ioutil"

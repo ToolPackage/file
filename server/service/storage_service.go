@@ -2,8 +2,8 @@ package service
 
 import (
 	"bytes"
-	"github.com/ToolPackage/fse/storage"
-	"github.com/ToolPackage/fse/tx"
+	"github.com/ToolPackage/fse/common/tx"
+	"github.com/ToolPackage/fse/server/storage"
 	"log"
 	"net/http"
 	"strings"
@@ -29,6 +29,7 @@ type FileInfo struct {
 }
 
 func auth(c *tx.Channel, _ *tx.Packet) {
+	// TODO
 	log.Println("client auth passed")
 	c.NewPacket(Resp).StatusCode(http.StatusOK).Emit()
 }
