@@ -2,11 +2,12 @@ package service
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/ToolPackage/fse/common/tx"
+	"github.com/ToolPackage/fse/common/utils"
 	"github.com/ToolPackage/fse/server/storage"
 	"log"
 	"net/http"
-	"strings"
 )
 
 // actions
@@ -56,29 +57,29 @@ func listFiles(c *tx.Channel, p *tx.Packet) {
 func uploadFile(c *tx.Channel, p *tx.Packet) {
 	filename, ok := p.Headers["filename"]
 	if !ok {
-		c.NewPacket(Resp).StatusCode(http.StatusBadRequest).Body("header filename missing").Emit()
+		c.RespBadRequest("header filename missing")
 		return
 	}
-	filename = strings.Trim(filename, " \t\r\n")
+	filename = utils.TrimWhitespaces(filename)
 	if len(filename) == 0 {
-		c.NewPacket(Resp).StatusCode(http.StatusBadRequest).Body("invalid filename").Emit()
+		c.RespBadRequest("invalid filename")
 		return
 	}
 
 	contentType, ok := p.Headers["contentType"]
 	if !ok {
-		c.NewPacket(Resp).StatusCode(http.StatusBadRequest).Body("header contentType missing").Emit()
+		c.RespBadRequest("header contentType missing")
 		return
 	}
-	contentType = strings.Trim(contentType, " \t\r\n")
+	contentType = utils.TrimWhitespaces(contentType)
 	if len(filename) == 0 {
-		c.NewPacket(Resp).StatusCode(http.StatusBadRequest).Body("invalid contentType").Emit()
+		c.RespBadRequest("invalid contentType")
 		return
 	}
 
 	file, err := storage.S.SaveFile(filename, contentType, bytes.NewReader(p.Content))
 	if err != nil {
-		c.NewPacket(Resp).StatusCode(http.StatusInternalServerError).Body(err.Error()).Emit()
+		c.RespInternalServerError(err.Error())
 		return
 	}
 
@@ -90,18 +91,52 @@ func uploadFile(c *tx.Channel, p *tx.Packet) {
 		FileSize:    int64(file.Size),
 		Partitions:  file.Partitions,
 	}
-	c.NewPacket(Resp).StatusCode(http.StatusAccepted).Body(fileInfo).Emit()
+	c.RespAccepted(fileInfo)
 }
 
 func downloadFile(c *tx.Channel, p *tx.Packet) {
-	c.NewPacket(Resp).StatusCode(http.StatusBadRequest).Emit()
+	fileId, ok := p.Headers["fileId"]
+	if !ok {
+		c.RespBadRequest("header fileId missing")
+		return
+	}
+	fileId = utils.TrimWhitespaces(fileId)
+	if len(fileId) == 0 {
+		c.RespBadRequest("invalid fileId")
+		return
+	}
+
+	file, ok := storage.S.GetFile(fileId)
+	if !ok {
+		c.RespNotFound("file not found")
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	_, err := buf.ReadFrom(file.OpenStream())
+	if err != nil {
+		c.RespInternalServerError(err.Error())
+		return
+	}
+	fmt.Println(buf.Len())
+	c.RespOk(buf.Bytes())
 }
 
 func deleteFile(c *tx.Channel, p *tx.Packet) {
-	id := string(p.Content)
-	if ok := storage.S.DeleteFile(id); ok {
+	fileId, ok := p.Headers["fileId"]
+	if !ok {
+		c.RespBadRequest("header fileId missing")
+		return
+	}
+	fileId = utils.TrimWhitespaces(fileId)
+	if len(fileId) == 0 {
+		c.RespBadRequest("invalid fileId")
+		return
+	}
+
+	if ok := storage.S.DeleteFile(fileId); ok {
 		c.NewPacket(Resp).StatusCode(http.StatusOK).Emit()
 	} else {
-		c.NewPacket(Resp).StatusCode(http.StatusInternalServerError).Emit()
+		c.RespInternalServerError("failed to delete file")
 	}
 }

@@ -9,11 +9,17 @@ func OrString(str ...string) string {
 	return ""
 }
 
-func Min(a int, b int) int {
-	if a < b {
-		return a
+func Min(v ...int) int {
+	if len(v) == 0 {
+		panic("invalid input")
 	}
-	return b
+	var min = v[0]
+	for i := 1; i < len(v); i++ {
+		if v[i] < min {
+			min = v[i]
+		}
+	}
+	return min
 }
 
 func ConvertUint16ToByte(v uint16, buf []byte, offset int) {

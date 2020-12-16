@@ -364,6 +364,7 @@ func (f *File) OpenStream() io.Reader {
 type FileDataReader struct {
 	fs               *FileStorage
 	file             *File
+	fileReadOffset   uint32
 	nextPartitionIdx int
 	currentChunk     *FileChunk
 	chunkReadOffset  int
@@ -373,6 +374,7 @@ func newFileDataReader(fs *FileStorage, file *File) *FileDataReader {
 	return &FileDataReader{
 		fs:               fs,
 		file:             file,
+		fileReadOffset:   0,
 		nextPartitionIdx: -1,
 		currentChunk:     nil,
 		chunkReadOffset:  0,
@@ -385,14 +387,18 @@ func (r *FileDataReader) Read(p []byte) (n int, err error) {
 		return
 	}
 
-	availableBytes := len(chunk.content) - r.chunkReadOffset
+	restBytes := r.file.Size - r.fileReadOffset
+	if restBytes == 0 {
+		return 0, io.EOF
+	}
 
-	nRead := utils.Min(availableBytes, len(p))
+	nRead := utils.Min(int(restBytes), len(chunk.content)-r.chunkReadOffset, len(p))
 	n = copy(p, chunk.content[r.chunkReadOffset:r.chunkReadOffset+nRead])
 	if n != nRead {
 		err = errors.New("copy chunk data error")
 	}
 	r.chunkReadOffset += n
+	r.fileReadOffset += uint32(n)
 	return
 }
 

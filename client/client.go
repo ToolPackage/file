@@ -129,6 +129,50 @@ func (f *FseClient) uploadFile(filename string, contentType string, content []by
 	return data, nil
 }
 
+func (f *FseClient) downloadFile(filename string) ([]byte, error) {
+	files, err := f.listFiles(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	if sz := len(files); sz == 0 {
+		return nil, fmt.Errorf("file not found")
+	} else if sz > 1 {
+		return nil, fmt.Errorf("multiple files matched specified name")
+	}
+
+	f.channel.NewPacket(Download).
+		Header("fileId", files[0].FileId).Emit()
+	res := f.channel.RecvPacket()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request failed: %s", string(res.Content))
+	}
+
+	return res.Content, nil
+}
+
+func (f *FseClient) deleteFile(filename string) error {
+	files, err := f.listFiles(filename)
+	if err != nil {
+		return err
+	}
+
+	if sz := len(files); sz == 0 {
+		return fmt.Errorf("file not found")
+	} else if sz > 1 {
+		return fmt.Errorf("multiple files matched specified name")
+	}
+
+	f.channel.NewPacket(Delete).
+		Header("fileId", files[0].FileId).Emit()
+	res := f.channel.RecvPacket()
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("request failed: %s", string(res.Content))
+	}
+
+	return nil
+}
+
 func (f *FseClient) close() {
 
 }

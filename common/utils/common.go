@@ -1,6 +1,9 @@
 package utils
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func ByteCountSI(b int64) string {
 	const unit = 1000
@@ -16,4 +19,8 @@ func ByteCountSI(b int64) string {
 
 	return fmt.Sprintf("%.1f %cB",
 		float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func TrimWhitespaces(s string) string {
+	return strings.Trim(s, " \t\r\n")
 }

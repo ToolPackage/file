@@ -168,6 +168,26 @@ func (c *Channel) sendString(s string) {
 	}
 }
 
+func (c *Channel) RespOk(body interface{}) {
+	c.NewPacket("resp").StatusCode(http.StatusOK).Body(body).Emit()
+}
+
+func (c *Channel) RespAccepted(body interface{}) {
+	c.NewPacket("resp").StatusCode(http.StatusAccepted).Body(body).Emit()
+}
+
+func (c *Channel) RespBadRequest(body interface{}) {
+	c.NewPacket("resp").StatusCode(http.StatusBadRequest).Body(body).Emit()
+}
+
+func (c *Channel) RespNotFound(body interface{}) {
+	c.NewPacket("resp").StatusCode(http.StatusNotFound).Body(body).Emit()
+}
+
+func (c *Channel) RespInternalServerError(body interface{}) {
+	c.NewPacket("resp").StatusCode(http.StatusInternalServerError).Body(body).Emit()
+}
+
 type PacketBuilder struct {
 	channel *Channel
 	packet  *Packet
