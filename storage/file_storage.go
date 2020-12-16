@@ -112,6 +112,7 @@ func (fs *FileStorage) saveStorageMetadata() {
 			log.Println(err)
 		}
 	}()
+
 	var writeEntry = func(data []byte) {
 		if err := metadataFile.WriteEntry(data); err != nil {
 			log.Fatal("failed to save storage metadata", err)
@@ -200,17 +201,18 @@ func getUserHomeDir() string {
 	panic("could not detect home directory")
 }
 
+// GetFile by generated file's uuid
 func (fs *FileStorage) GetFile(id string) (f *File, ok bool) {
 	f, ok = fs.files[id]
 	return
 }
 
-func (fs *FileStorage) GetAllFiles() []*File {
-	list := make([]*File, len(fs.files))
-	i := 0
+func (fs *FileStorage) GetAllFiles(prefixFilter string) []*File {
+	list := make([]*File, 0)
 	for _, file := range fs.files {
-		list[i] = file
-		i++
+		if strings.Index(file.Name, prefixFilter) == 0 {
+			list = append(list, file)
+		}
 	}
 	return list
 }

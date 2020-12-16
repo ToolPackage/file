@@ -1,6 +1,7 @@
 package tx
 
 import (
+	"encoding/json"
 	"github.com/ToolPackage/fse/utils"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -16,15 +17,20 @@ func TestNewChannel(t *testing.T) {
 	chan1.NewPacket("test").
 		StatusCode(http.StatusAccepted).
 		Header("name", "asd").
-		Body("hello").
+		Body([]string{"hello"}).
 		Emit()
 	packet := chan2.RecvPacket()
 	assert.NotNil(t, packet)
-	assert.Equal(t, packet.Action, "test")
-	assert.Equal(t, packet.StatusCode, http.StatusAccepted)
-	assert.Equal(t, packet.ContentLength, 7)
-	assert.Equal(t, packet.Headers["name"], "asd")
-	assert.Equal(t, string(packet.Content), "\"hello\"")
+	assert.Equal(t, "test", packet.Action)
+	assert.Equal(t, http.StatusAccepted, packet.StatusCode)
+	assert.Equal(t, 9, packet.ContentLength)
+	assert.Equal(t, "asd", packet.Headers["name"])
+	assert.Equal(t, "[\"hello\"]", string(packet.Content))
+
+	data := make([]string, 0)
+	assert.Nil(t, json.Unmarshal(packet.Content, &data))
+	assert.Equal(t, 1, len(data))
+	assert.Equal(t, "hello", data[0])
 }
 
 type DualStream struct {

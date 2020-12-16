@@ -188,12 +188,20 @@ func (pb *PacketBuilder) StatusCode(code int) *PacketBuilder {
 }
 
 func (pb *PacketBuilder) Body(content interface{}) *PacketBuilder {
-	jsonBytes, err := json.Marshal(content)
-	if err != nil {
-		log.Fatal(err)
+	var data []byte
+	switch content.(type) {
+	case []byte:
+		data = content.([]byte)
+	default:
+		jsonBytes, err := json.Marshal(content)
+		if err != nil {
+			log.Fatal(err)
+		}
+		data = jsonBytes
 	}
-	pb.packet.Content = jsonBytes
-	pb.packet.ContentLength = len(jsonBytes)
+
+	pb.packet.Content = data
+	pb.packet.ContentLength = len(data)
 	return pb
 }
 
